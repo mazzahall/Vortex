@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api-invidious-1/:path*",
-      "destination": "https://vid.puffyan.us/:path*"
+      "destination": "https://inv.tux.im/:path*"
     },
     {
       "source": "/api-invidious-2/:path*",
-      "destination": "https://invidious.drgns.space/:path*"
+      "destination": "https://invidious.nerdvpn.de/:path*"
     },
     {
       "source": "/(.*)",
