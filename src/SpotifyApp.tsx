@@ -18,10 +18,25 @@ import {
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { auth } from './firebase';
 import { AuthModal } from './components/AuthModal';
+import { searchSongs, type SongResult } from './searchClient';
 
 const MOOD_TAGS = [
   'Bersantai', 'Senang', 'Sedih', 'Romansa', 'Perjalanan', 'Mengisi energi', 'Pesta', 'Olahraga', 'Tidur'
 ];
+
+// YouTube API mengirim teks dengan HTML entity (&amp; &#39; dll), jadi di-decode dulu
+const decodeHtml = (s: string) => {
+  const el = document.createElement('textarea');
+  el.innerHTML = s;
+  return el.value;
+};
+
+const toSong = (r: SongResult): Song => ({
+  id: r.id,
+  title: decodeHtml(r.title),
+  artist: decodeHtml(r.channel),
+  cover: r.thumbnail || `https://i.ytimg.com/vi/${r.id}/hqdefault.jpg`,
+});
 
 export const SpotifyApp: React.FC = () => {
   const [songs, setSongs] = useState<Song[]>(() => JSON.parse(localStorage.getItem('vortex_songs') || '[]'));
@@ -47,7 +62,6 @@ export const SpotifyApp: React.FC = () => {
   // Search & Suggestion States
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [previewSongs, setPreviewSongs] = useState<Song[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
@@ -83,51 +97,23 @@ export const SpotifyApp: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch Suggestions & Live Preview saat mengetik
-  // Fetch Suggestions & Live Preview saat mengetik (Fix ESLint cascading render)
+  // Saran teks saat mengetik (tidak memanggil API, jadi kuota YouTube aman)
   useEffect(() => {
-    // Jika query kosong, bersihkan state di dalam timer atau hindari sync setState di body effect
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       if (!searchQuery.trim()) {
         setSuggestions([]);
-        setPreviewSongs([]);
         return;
       }
 
       const query = searchQuery.trim().toLowerCase();
-      const mockSuggestions = [
+      setSuggestions([
         `${query}`,
         `${query} lyrics`,
         `${query} dance`,
         `${query} mirror`,
         `${query} de aerosmith`,
         `masteran cendet ${query}`
-      ];
-      setSuggestions(mockSuggestions);
-
-      // Fetch live song previews dari Invidious API
-      try {
-        const url = `/api-invidious-1/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            interface InvidiousItem { videoId?: string; title?: string; author?: string; }
-            const formatted: Song[] = data
-              .filter((item: InvidiousItem) => item.videoId && item.title)
-              .slice(0, 3)
-              .map((item: InvidiousItem) => ({
-                id: item.videoId!,
-                title: item.title!,
-                artist: item.author || 'Unknown Artist',
-                cover: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`
-              }));
-            setPreviewSongs(formatted);
-          }
-        }
-      } catch (err) {
-        console.warn('Error fetching search preview...', err);
-      }
+      ]);
     }, 250);
 
     return () => clearTimeout(timer);
@@ -241,39 +227,17 @@ export const SpotifyApp: React.FC = () => {
     }
   }, [handleNext]);
 
+  // Pencarian lewat /api/search (YouTube Data API v3 via Vercel serverless function)
   const searchYouTube = async (query: string) => {
     if (!query.trim()) return;
     setIsSearchFocused(false);
     setActiveTab('search');
-    
-    const apiEndpoints = [
-      `/api-invidious-1/api/v1/search?q=${encodeURIComponent(query + ' official audio')}&type=video`,
-      `/api-invidious-2/api/v1/search?q=${encodeURIComponent(query + ' official audio')}&type=video`
-    ];
 
-    for (const url of apiEndpoints) {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) continue;
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          interface InvidiousItem { videoId?: string; title?: string; author?: string; }
-          const formatted: Song[] = data
-            .filter((item: InvidiousItem) => item.videoId && item.title)
-            .map((item: InvidiousItem) => ({
-              id: item.videoId!,
-              title: item.title!,
-              artist: item.author || 'Unknown Artist',
-              cover: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`
-            }));
-          if (formatted.length > 0) {
-            setSearchResults(formatted);
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn('Fallback endpoint...', err);
-      }
+    try {
+      const results = await searchSongs(`${query} official audio`);
+      setSearchResults(results.map(toSong));
+    } catch (err) {
+      console.error('Search gagal:', err);
     }
   };
 
@@ -334,7 +298,6 @@ export const SpotifyApp: React.FC = () => {
                     onClick={() => {
                       setSearchQuery('');
                       setSuggestions([]);
-                      setPreviewSongs([]);
                     }}
                     className="absolute right-3.5 text-neutral-400 hover:text-white transition"
                   >
@@ -343,11 +306,9 @@ export const SpotifyApp: React.FC = () => {
                 )}
               </div>
 
-              {/* Suggestions Dropdown (Persis seperti gambar) */}
+              {/* Suggestions Dropdown */}
               {isSearchFocused && searchQuery.trim().length > 0 && (
                 <div className="absolute top-12 left-0 right-0 bg-[#0f0f0f] border border-neutral-800 rounded-2xl shadow-2xl z-50 overflow-hidden py-2 animate-fade-in">
-                  
-                  {/* Daftar Saran Teks */}
                   <div className="py-1">
                     {suggestions.map((text, idx) => (
                       <div
@@ -363,33 +324,6 @@ export const SpotifyApp: React.FC = () => {
                       </div>
                     ))}
                   </div>
-
-                  {/* Pratinjau Hasil Lagu Langsung */}
-                  {previewSongs.length > 0 && (
-                    <div className="border-t border-neutral-800/80 pt-2 mt-1">
-                      {previewSongs.map((song) => (
-                        <div
-                          key={`prev-${song.id}`}
-                          onClick={() => {
-                            playSong(song);
-                            setIsSearchFocused(false);
-                          }}
-                          className="flex items-center gap-3 px-4 py-2 hover:bg-neutral-800/80 cursor-pointer transition group"
-                        >
-                          <img src={song.cover} alt={song.title} className="w-10 h-10 rounded-md object-cover flex-shrink-0" />
-                          <div className="truncate min-w-0">
-                            <p className="text-sm font-semibold text-white truncate group-hover:text-neutral-200">
-                              {song.title}
-                            </p>
-                            <p className="text-xs text-neutral-400 truncate">
-                              Lagu • {song.artist}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
                 </div>
               )}
             </div>

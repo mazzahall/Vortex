@@ -9,15 +9,11 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      '/api-invidious-1': {
-        target: 'https://invidious.f5.si',
+      // Saat development, teruskan /api/* ke deployment Vercel
+      '/api': {
+        target: 'https://vortex-khaki-five.vercel.app',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api-invidious-1/, ''),
-      },
-      '/api-invidious-2': {
-        target: 'https://inv.nadeko.net',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api-invidious-2/, ''),
+        secure: true,
       },
     },
   },

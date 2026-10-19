@@ -9,7 +9,6 @@ import {
   PlaySquare,
   ListPlus,
   Bookmark,
-  Download,
   FolderPlus,
   Disc
 } from 'lucide-react';
@@ -47,17 +46,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 1. Download Handler (MP3 Direct Download)
-  const handleDownload = (song: Song) => {
-    const streamUrl = `/api-invidious-1/latest_version?id=${song.id}&itag=140`;
-    const link = document.createElement('a');
-    link.href = streamUrl;
-    link.download = `${song.title} - ${song.artist}.mp3`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div className="space-y-8">
       <div className="space-y-4">
@@ -92,7 +80,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       {song.title}
                     </h3>
                     <p className="text-xs text-neutral-400 truncate mt-0.5">
-                      {song.artist} • 100 rb pemutaran
+                      {song.artist}
                     </p>
                   </div>
                 </div>
@@ -134,7 +122,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         className="absolute right-0 top-10 w-56 bg-[#212121] border border-neutral-800 rounded-2xl shadow-2xl z-50 py-2 text-sm text-neutral-200 font-medium"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {/* 1. Mulai Mix: Cari lagu serupa berdasarkan nama artis */}
                         <button 
                           onClick={() => {
                             onGoToSearch(`${song.artist} mix`);
@@ -146,7 +133,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           <span>Mulai mix</span>
                         </button>
 
-                        {/* 2. Putar setelah ini: Sisipkan lagu ke antrean urutan pertama */}
                         <button 
                           onClick={() => {
                             if (onPlayNext) onPlayNext(song);
@@ -158,7 +144,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           <span>Putar setelah ini</span>
                         </button>
 
-                        {/* 3. Tambahkan ke antrean: Masukkan ke bagian paling akhir antrean */}
                         <button 
                           onClick={() => {
                             if (onAddToQueue) onAddToQueue(song);
@@ -170,7 +155,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           <span>Tambahkan ke antrean</span>
                         </button>
 
-                        {/* 4. Simpan ke koleksi / Menyukai lagu */}
                         <button 
                           onClick={() => {
                             if (onToggleLike) onToggleLike(song);
@@ -182,19 +166,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           <span>Simpan ke koleksi</span>
                         </button>
 
-                        {/* 5. Download MP3 */}
-                        <button 
-                          onClick={() => {
-                            handleDownload(song);
-                            setActiveMenuId(null);
-                          }} 
-                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left text-purple-400 hover:text-purple-300"
-                        >
-                          <Download className="w-4 h-4" />
-                          <span>Download</span>
-                        </button>
-
-                        {/* 6. Simpan ke playlist */}
                         <button 
                           onClick={() => {
                             if (onSaveToPlaylist) onSaveToPlaylist(song);
@@ -206,7 +177,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           <span>Simpan ke playlist</span>
                         </button>
 
-                        {/* 7. Buka Album: Cari discography/album lagu ini */}
                         <button 
                           onClick={() => {
                             onGoToSearch(`Album ${song.artist}`);
