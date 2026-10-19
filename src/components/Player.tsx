@@ -71,11 +71,62 @@ export const Player: React.FC<PlayerProps> = ({
 }) => {
   const [showMenu, setShowMenu] = useState<boolean>(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const handleDownload = async () => {
+    if (!currentSong) return;
+    setShowMenu(false);
+    setIsDownloading(true);
+
+    try {
+      let audioSrc = currentSong.audioUrl;
+
+      if (!audioSrc && currentSong.id) {
+        const response = await fetch('https://api.cobalt.tools/api/json', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            url: `https://www.youtube.com/watch?v=${currentSong.id}`,
+            isAudioOnly: true,
+            aFormat: 'mp3'
+          })
+        });
+        const data = await response.json();
+        if (data.url) {
+          audioSrc = data.url;
+        }
+      }
+
+      if (audioSrc) {
+        const res = await fetch(audioSrc);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `${currentSong.title} - ${currentSong.artist}.mp3`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        alert('Gagal mengambil link audio.');
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Terjadi kesalahan saat mengunduh lagu.');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   if (!currentSong) return null;
@@ -136,7 +187,7 @@ export const Player: React.FC<PlayerProps> = ({
             <SkipForward className="w-5 h-5 fill-current" />
           </button>
 
-          {/* Format Waktu (Contoh: 0:08 / 3:33) */}
+          {/* Format Waktu */}
           <span className="text-xs text-neutral-400 font-normal tracking-wide ml-2">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
@@ -156,7 +207,9 @@ export const Player: React.FC<PlayerProps> = ({
               {currentSong.title}
             </h4>
             <p className="text-xs text-neutral-400 truncate mt-0.5">
-              {currentSong.artist} • {currentSong.title} • 2026
+              {currentSong.artist}
+              {currentSong.album ? ` • ${currentSong.album}` : ''}
+              {currentSong.year ? ` • ${currentSong.year}` : ''}
             </p>
           </div>
 
@@ -208,9 +261,13 @@ export const Player: React.FC<PlayerProps> = ({
                     <Bookmark className="w-4 h-4 text-neutral-300" />
                     <span>Simpan ke koleksi</span>
                   </button>
-                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                  <button 
+                    onClick={handleDownload} 
+                    disabled={isDownloading}
+                    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left disabled:opacity-50"
+                  >
                     <Download className="w-4 h-4 text-neutral-300" />
-                    <span>Download</span>
+                    <span>{isDownloading ? 'Mengunduh...' : 'Download'}</span>
                   </button>
                   <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
                     <FolderPlus className="w-4 h-4 text-neutral-300" />

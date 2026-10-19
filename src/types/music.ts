@@ -8,6 +8,10 @@ export interface Song {
   title: string;
   artist: string;
   cover: string;
+  audioUrl?: string;
+  album?: string;
+  year?: string;
+  duration?: number;
 }
 
 export interface Playlist {
