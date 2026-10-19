@@ -1,16 +1,5 @@
 {
   "rewrites": [
-    {
-      "source": "/api-invidious-1/:path*",
-      "destination": "https://inv.tux.im/:path*"
-    },
-    {
-      "source": "/api-invidious-2/:path*",
-      "destination": "https://invidious.nerdvpn.de/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
