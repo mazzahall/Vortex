@@ -1,9 +1,26 @@
-import React from 'react';
-import { 
-  Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, 
-  Volume2, VolumeX, Heart, Music2, Mic2, List, Maximize2
-} from 'lucide-react';
+import React, { useState } from 'react';
 import type { Song } from '../types/music';
+import { 
+  Play, 
+  Pause, 
+  SkipBack, 
+  SkipForward, 
+  Volume2, 
+  VolumeX, 
+  Shuffle, 
+  Repeat, 
+  ThumbsUp,
+  ThumbsDown,
+  MoreVertical,
+  ChevronUp,
+  Radio,
+  PlaySquare,
+  ListPlus,
+  Bookmark,
+  Download,
+  FolderPlus,
+  Disc
+} from 'lucide-react';
 
 interface PlayerProps {
   currentSong: Song | null;
@@ -41,8 +58,6 @@ export const Player: React.FC<PlayerProps> = ({
   isShuffle,
   repeatMode,
   isLiked,
-  showLyrics,
-  showQueue,
   onTogglePlayPause,
   onNext,
   onPrev,
@@ -52,134 +67,230 @@ export const Player: React.FC<PlayerProps> = ({
   onToggleShuffle,
   onToggleRepeat,
   onToggleLike,
-  onToggleLyrics,
-  onToggleQueue,
   onToggleFullscreen,
 }) => {
-  const formatTime = (timeInSeconds: number) => {
-    if (isNaN(timeInSeconds)) return '0:00';
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = Math.floor(timeInSeconds % 60);
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  const [showMenu, setShowMenu] = useState<boolean>(false);
+  const [showVolumeSlider, setShowVolumeSlider] = useState<boolean>(false);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  if (!currentSong) return null;
+
+  const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+
   return (
-    <footer className="h-24 bg-[#0b0813]/90 border-t border-slate-800/80 px-6 flex items-center justify-between z-40 backdrop-blur-2xl shrink-0">
-      <div className="flex items-center gap-4 w-1/4">
-        {currentSong ? (
-          <>
-            <div className="w-14 h-14 rounded-xl overflow-hidden border border-slate-700/50 shadow-md relative group shrink-0">
-              <img src={currentSong.cover} alt={currentSong.title} className="w-full h-full object-cover" />
-            </div>
-            <div className="flex flex-col truncate">
-              <span className="font-semibold text-sm text-slate-100 truncate hover:underline cursor-pointer">
-                {currentSong.title}
-              </span>
-              <span className="text-xs text-slate-400 truncate hover:underline cursor-pointer">
-                {currentSong.artist}
-              </span>
-            </div>
-            <button
-              onClick={() => onToggleLike(currentSong)}
-              className={`p-2 transition ${isLiked ? 'text-violet-500 hover:scale-110' : 'text-slate-400 hover:text-white'}`}
-            >
-              <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
-            </button>
-          </>
-        ) : (
-          <div className="flex items-center gap-3 text-slate-500">
-            <div className="w-12 h-12 rounded-xl bg-slate-800/50 flex items-center justify-center">
-              <Music2 className="w-6 h-6" />
-            </div>
-            <span className="text-xs">Pilih lagu untuk diputar</span>
-          </div>
-        )}
+    <footer className="h-16 bg-[#181818] text-white flex items-center justify-between z-40 relative select-none border-t border-neutral-800/50">
+      
+      {/* 1. Progress Bar Merah Persis di Batas Atas Bar */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-1 bg-neutral-700/60 cursor-pointer group z-50"
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const newPercent = clickX / rect.width;
+          onSeek(newPercent * duration);
+        }}
+      >
+        <div 
+          className="h-full bg-red-600 relative transition-all duration-75"
+          style={{ width: `${progressPercent}%` }}
+        >
+          {/* Dot/Knob Merah */}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-red-600 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
       </div>
 
-      <div className="flex flex-col items-center gap-2 w-2/4 max-w-xl">
+      <div className="w-full px-6 flex items-center justify-between">
+        
+        {/* 2. Sisi Kiri: Controls (Prev, Play, Next) & Waktu */}
         <div className="flex items-center gap-5">
           <button 
-            onClick={onToggleShuffle}
-            className={`transition ${isShuffle ? 'text-violet-400' : 'text-slate-400 hover:text-white'}`}
+            onClick={onPrev} 
+            className="text-neutral-300 hover:text-white transition p-1"
+            title="Sebelumnya"
           >
-            <Shuffle className="w-4 h-4" />
-          </button>
-
-          <button onClick={onPrev} className="text-slate-300 hover:text-white transition">
             <SkipBack className="w-5 h-5 fill-current" />
           </button>
 
-          <button
-            onClick={onTogglePlayPause}
-            disabled={!currentSong}
-            className="w-10 h-10 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-500 hover:scale-105 text-white flex items-center justify-center shadow-lg shadow-violet-600/30 transition disabled:opacity-50 cursor-pointer"
+          <button 
+            onClick={onTogglePlayPause} 
+            className="text-white hover:scale-105 transition p-1"
+            title={isPlaying ? "Jeda" : "Putar"}
           >
-            {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
-          </button>
-
-          <button onClick={onNext} className="text-slate-300 hover:text-white transition">
-            <SkipForward className="w-5 h-5 fill-current" />
+            {isPlaying ? (
+              <Pause className="w-7 h-7 fill-current" />
+            ) : (
+              <Play className="w-7 h-7 fill-current ml-0.5" />
+            )}
           </button>
 
           <button 
-            onClick={onToggleRepeat}
-            className={`relative transition ${repeatMode !== 'off' ? 'text-violet-400' : 'text-slate-400 hover:text-white'}`}
+            onClick={onNext} 
+            className="text-neutral-300 hover:text-white transition p-1"
+            title="Berikutnya"
           >
-            <Repeat className="w-4 h-4" />
-            {repeatMode === 'one' && (
-              <span className="absolute -top-1 -right-2 text-[9px] font-bold bg-violet-600 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">
-                1
-              </span>
+            <SkipForward className="w-5 h-5 fill-current" />
+          </button>
+
+          {/* Format Waktu (Contoh: 0:08 / 3:33) */}
+          <span className="text-xs text-neutral-400 font-normal tracking-wide ml-2">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
+        </div>
+
+        {/* 3. Sisi Tengah: Detail Lagu (Cover, Judul, Artis, Thumbs Up/Down, Dots) */}
+        <div className="flex items-center gap-4 max-w-xl truncate px-4">
+          <img 
+            src={currentSong.cover} 
+            alt={currentSong.title} 
+            className="w-10 h-10 rounded object-cover flex-shrink-0 cursor-pointer"
+            onClick={onToggleFullscreen}
+          />
+
+          <div className="truncate text-left">
+            <h4 className="text-sm font-semibold text-white truncate hover:underline cursor-pointer">
+              {currentSong.title}
+            </h4>
+            <p className="text-xs text-neutral-400 truncate mt-0.5">
+              {currentSong.artist} • {currentSong.title} • 2026
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+            <button 
+              onClick={() => onToggleLike(currentSong)} 
+              className={`p-1.5 rounded-full hover:bg-neutral-800 transition ${
+                isLiked ? 'text-white' : 'text-neutral-300 hover:text-white'
+              }`}
+              title="Sukai"
+            >
+              <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-white' : ''}`} />
+            </button>
+
+            <button 
+              className="p-1.5 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition"
+              title="Tidak Suka"
+            >
+              <ThumbsDown className="w-4 h-4" />
+            </button>
+
+            <div className="relative">
+              <button 
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-1.5 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition"
+                title="Opsi Lainnya"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+
+              {showMenu && (
+                <div 
+                  className="absolute bottom-12 left-1/2 -translate-x-1/2 w-56 bg-[#212121] border border-neutral-800 rounded-2xl shadow-2xl z-50 py-2 text-sm text-neutral-200 font-medium"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                    <Radio className="w-4 h-4 text-neutral-300" />
+                    <span>Mulai mix</span>
+                  </button>
+                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                    <PlaySquare className="w-4 h-4 text-neutral-300" />
+                    <span>Putar setelah ini</span>
+                  </button>
+                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                    <ListPlus className="w-4 h-4 text-neutral-300" />
+                    <span>Tambahkan ke antrean</span>
+                  </button>
+                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                    <Bookmark className="w-4 h-4 text-neutral-300" />
+                    <span>Simpan ke koleksi</span>
+                  </button>
+                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                    <Download className="w-4 h-4 text-neutral-300" />
+                    <span>Download</span>
+                  </button>
+                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                    <FolderPlus className="w-4 h-4 text-neutral-300" />
+                    <span>Simpan ke playlist</span>
+                  </button>
+                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                    <Disc className="w-4 h-4 text-neutral-300" />
+                    <span>Buka album</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Sisi Kanan: Volume, Repeat, Shuffle, Expand Arrow */}
+        <div className="flex items-center gap-4 relative">
+          
+          {/* Slider Volume Popover / Inline */}
+          <div 
+            className="relative flex items-center"
+            onMouseEnter={() => setShowVolumeSlider(true)}
+            onMouseLeave={() => setShowVolumeSlider(false)}
+          >
+            <button 
+              onClick={onToggleMute} 
+              className="p-1 text-neutral-300 hover:text-white transition"
+              title="Mute / Unmute"
+            >
+              {isMuted || volume === 0 ? (
+                <VolumeX className="w-5 h-5" />
+              ) : (
+                <Volume2 className="w-5 h-5" />
+              )}
+            </button>
+
+            {showVolumeSlider && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#212121] border border-neutral-800 p-2 rounded-xl shadow-xl flex items-center">
+                <input 
+                  type="range" 
+                  min={0} 
+                  max={100} 
+                  value={isMuted ? 0 : volume} 
+                  onChange={(e) => onVolumeChange(Number(e.target.value))}
+                  className="w-20 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-red-600"
+                />
+              </div>
             )}
+          </div>
+
+          <button 
+            onClick={onToggleRepeat} 
+            className={`p-1 transition ${
+              repeatMode !== 'off' ? 'text-white' : 'text-neutral-400 hover:text-white'
+            }`}
+            title="Ulangi"
+          >
+            <Repeat className="w-5 h-5" />
           </button>
-        </div>
 
-        <div className="w-full flex items-center gap-3 text-xs text-slate-400">
-          <span>{formatTime(currentTime)}</span>
-          <input
-            type="range"
-            min={0}
-            max={duration || 100}
-            value={currentTime}
-            onChange={(e) => onSeek(Number(e.target.value))}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
-          />
-          <span>{formatTime(duration)}</span>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-end gap-3 w-1/4">
-        <button 
-          onClick={onToggleLyrics}
-          className={`transition ${showLyrics ? 'text-violet-400' : 'text-slate-400 hover:text-white'}`}
-        >
-          <Mic2 className="w-5 h-5" />
-        </button>
-
-        <button 
-          onClick={onToggleQueue}
-          className={`transition ${showQueue ? 'text-violet-400' : 'text-slate-400 hover:text-white'}`}
-        >
-          <List className="w-5 h-5" />
-        </button>
-
-        <button onClick={onToggleFullscreen} className="text-slate-400 hover:text-white transition">
-          <Maximize2 className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center gap-2">
-          <button onClick={onToggleMute} className="text-slate-400 hover:text-white transition">
-            {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-red-400" /> : <Volume2 className="w-5 h-5" />}
+          <button 
+            onClick={onToggleShuffle} 
+            className={`p-1 transition ${
+              isShuffle ? 'text-white' : 'text-neutral-400 hover:text-white'
+            }`}
+            title="Acak"
+          >
+            <Shuffle className="w-5 h-5" />
           </button>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={isMuted ? 0 : volume}
-            onChange={(e) => onVolumeChange(Number(e.target.value))}
-            className="w-20 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
-          />
+
+          <button 
+            onClick={onToggleFullscreen} 
+            className="p-1 text-neutral-300 hover:text-white transition"
+            title="Mekarkan Layar"
+          >
+            <ChevronUp className="w-5 h-5" />
+          </button>
+
         </div>
+
       </div>
     </footer>
   );
