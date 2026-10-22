@@ -9,7 +9,7 @@
       "use": "@vercel/node"
     },
     {
-      "src": "server/app.py",
+      "src": "api/app.py",
       "use": "@vercel/python"
     }
   ],
@@ -20,7 +20,7 @@
     },
     {
       "source": "/api/download",
-      "destination": "/server/app.py"
+      "destination": "/api/app.py"
     },
     {
       "source": "/((?!api/|assets/|.*\\..*).*)",
