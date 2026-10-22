@@ -511,9 +511,12 @@ export const SpotifyApp: React.FC = () => {
                   {history.length > 0 && (
                     <button
                       onClick={() => {
+                        // Mereset state & menghapus cache localStorage secara total
                         setHistory([]);
                         setSongs([]);
                         setPlayedIds([]);
+                        localStorage.removeItem('vortex_history');
+                        localStorage.removeItem('vortex_songs');
                       }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-red-500/10 text-neutral-400 hover:text-red-400 border border-neutral-800 text-xs transition"
                     >

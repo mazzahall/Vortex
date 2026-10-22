@@ -1,243 +1,118 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
+import { Play, Plus, ListPlus, Heart } from 'lucide-react';
 import type { Song } from '../types/music';
-import { downloadSong } from '../utils/download';
-import { 
-  Play, 
-  ThumbsUp, 
-  ThumbsDown, 
-  MoreVertical,
-  Radio,
-  PlaySquare,
-  ListPlus,
-  Bookmark,
-  Download,
-  FolderPlus,
-  Disc
-} from 'lucide-react';
 
 interface HomeViewProps {
   songs: Song[];
   history: Song[];
   onSelectSong: (index: number, list?: Song[]) => void;
-  onGoToSearch: (query?: string) => void;
+  onGoToSearch: (query: string) => void;
   onPlayNext?: (song: Song) => void;
   onAddToQueue?: (song: Song) => void;
   onToggleLike?: (song: Song) => void;
-  onSaveToPlaylist?: (song: Song) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
-  songs = [],
+  songs,
+  history,
   onSelectSong,
   onGoToSearch,
   onPlayNext,
   onAddToQueue,
   onToggleLike,
-  onSaveToPlaylist,
 }) => {
-  const [activeMenuId, setActiveMenuId] = useState<string | number | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | number | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setActiveMenuId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleDownloadClick = async (e: React.MouseEvent, song: Song) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setActiveMenuId(null);
-
-    const songId = song?.id;
-    if (!songId) {
-      alert('ID lagu tidak ditemukan.');
-      return;
-    }
-
-    setDownloadingId(songId);
-    try {
-      await downloadSong(String(songId), `${song.title || 'Music'} - ${song.artist || 'Artist'}`);
-    } catch (err) {
-      console.error('Error saat mendownload:', err);
-    } finally {
-      setDownloadingId(null);
-    }
-  };
+  // Pilihan Cepat mengambil langsung dari history atau daftar songs utama
+  const quickPicks = history.length > 0 ? history : songs;
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">Pilihan cepat</h2>
+    <div className="flex flex-col gap-8 pb-12">
+      {/* Bagian Pilihan Cepat (Quick Picks) */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-white tracking-tight">Pilihan Cepat</h2>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2 relative">
-          {songs.map((song, index) => {
-            const songIdentifier = song?.id ?? index;
-            const isMenuOpen = String(activeMenuId) === String(songIdentifier);
-            const isDownloading = String(downloadingId) === String(songIdentifier);
-
-            return (
+        {quickPicks.length === 0 ? (
+          <div className="bg-neutral-900/40 border border-neutral-800/80 rounded-2xl p-8 text-center">
+            <p className="text-neutral-400 text-sm">Belum ada lagu di Pilihan Cepat.</p>
+            <button
+              onClick={() => onGoToSearch('lagu populer')}
+              className="mt-3 text-xs text-red-500 font-semibold hover:underline"
+            >
+              Cari lagu favorit kamu
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {quickPicks.map((song, idx) => (
               <div
-                key={songIdentifier}
-                onClick={() => onSelectSong && onSelectSong(index, songs)}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-900/90 transition duration-150 cursor-pointer group relative"
+                key={`qp-${song.id}-${idx}`}
+                onClick={() => onSelectSong(idx, quickPicks)}
+                className="group relative bg-neutral-900/60 hover:bg-neutral-800/80 p-3 rounded-2xl border border-neutral-800/60 cursor-pointer transition flex flex-col"
               >
-                <div className="flex items-center gap-4 min-w-0 flex-1">
-                  <div className="relative w-12 h-12 flex-shrink-0 rounded-md overflow-hidden bg-neutral-900">
-                    <img 
-                      src={song?.cover || ''} 
-                      alt={song?.title || 'Cover'} 
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3">
+                  <img
+                    src={song.cover}
+                    alt={song.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                    <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition">
                       <Play className="w-5 h-5 fill-white text-white ml-0.5" />
                     </div>
                   </div>
-
-                  <div className="truncate pr-2">
-                    <h3 className="text-sm font-semibold text-white truncate group-hover:text-neutral-200">
-                      {song?.title || 'Judul tidak diketahui'}
-                    </h3>
-                    <p className="text-xs text-neutral-400 truncate mt-0.5">
-                      {song?.artist || 'Artis tidak diketahui'}
-                    </p>
-                  </div>
                 </div>
 
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (onToggleLike) onToggleLike(song);
-                    }} 
-                    className="p-2 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800 transition"
-                    title="Sukai"
-                  >
-                    <ThumbsUp className="w-4 h-4" />
-                  </button>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-white truncate group-hover:text-red-400 transition">
+                    {song.title}
+                  </p>
+                  <p className="text-xs text-neutral-400 truncate mt-0.5">{song.artist}</p>
+                </div>
 
-                  <button 
-                    onClick={(e) => e.stopPropagation()} 
-                    className="p-2 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800 transition"
-                    title="Tidak Suka"
-                  >
-                    <ThumbsDown className="w-4 h-4" />
-                  </button>
-                  
-                  <div className="relative">
-                    <button 
+                {/* Akses Cepat Opsional */}
+                <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-neutral-800/40 opacity-0 group-hover:opacity-100 transition">
+                  {onToggleLike && (
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setActiveMenuId(isMenuOpen ? null : songIdentifier);
-                      }} 
-                      className="p-2 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800 transition"
+                        onToggleLike(song);
+                      }}
+                      className="p-1 text-neutral-400 hover:text-white transition"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <Heart className="w-3.5 h-3.5" />
                     </button>
-
-                    {isMenuOpen && (
-                      <div 
-                        ref={menuRef}
-                        className="absolute right-0 top-10 w-56 bg-[#212121] border border-neutral-800 rounded-2xl shadow-2xl z-50 py-2 text-sm text-neutral-200 font-medium"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onGoToSearch(`${song.artist} mix`);
-                            setActiveMenuId(null);
-                          }} 
-                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
-                        >
-                          <Radio className="w-4 h-4 text-neutral-300" />
-                          <span>Mulai mix</span>
-                        </button>
-
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onPlayNext) onPlayNext(song);
-                            setActiveMenuId(null);
-                          }} 
-                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
-                        >
-                          <PlaySquare className="w-4 h-4 text-neutral-300" />
-                          <span>Putar setelah ini</span>
-                        </button>
-
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onAddToQueue) onAddToQueue(song);
-                            setActiveMenuId(null);
-                          }} 
-                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
-                        >
-                          <ListPlus className="w-4 h-4 text-neutral-300" />
-                          <span>Tambahkan ke antrean</span>
-                        </button>
-
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onToggleLike) onToggleLike(song);
-                            setActiveMenuId(null);
-                          }} 
-                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
-                        >
-                          <Bookmark className="w-4 h-4 text-neutral-300" />
-                          <span>Simpan ke koleksi</span>
-                        </button>
-
-                        <button 
-                          type="button"
-                          onClick={(e) => handleDownloadClick(e, song)}
-                          disabled={isDownloading}
-                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left text-neutral-200 disabled:opacity-50 cursor-pointer"
-                        >
-                          <Download className="w-4 h-4 text-neutral-300" />
-                          <span>{isDownloading ? 'Proses...' : 'Download'}</span>
-                        </button>
-
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onSaveToPlaylist) onSaveToPlaylist(song);
-                            setActiveMenuId(null);
-                          }} 
-                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
-                        >
-                          <FolderPlus className="w-4 h-4 text-neutral-300" />
-                          <span>Simpan ke playlist</span>
-                        </button>
-
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onGoToSearch(`Album ${song.artist}`);
-                            setActiveMenuId(null);
-                          }} 
-                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
-                        >
-                          <Disc className="w-4 h-4 text-neutral-300" />
-                          <span>Buka album</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  )}
+                  {onPlayNext && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPlayNext(song);
+                      }}
+                      className="p-1 text-neutral-400 hover:text-white transition"
+                      title="Putar Berikutnya"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {onAddToQueue && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddToQueue(song);
+                      }}
+                      className="p-1 text-neutral-400 hover:text-white transition"
+                      title="Tambah ke Antrean"
+                    >
+                      <ListPlus className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 };
