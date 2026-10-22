@@ -7,7 +7,7 @@ export const downloadSong = (videoId: string, title: string) => {
   const cleanTitle = title ? encodeURIComponent(title) : 'music';
   
   // Mengarahkan ke server Python di port 4000
-  const downloadUrl = `http://localhost:4000/download?videoId=${videoId}&title=${cleanTitle}`;
+  const downloadUrl = `/api/download?videoId=${videoId}&title=${encodeURIComponent(title)}`;
 
   // Trigger download otomatis di browser
   const a = document.createElement('a');
