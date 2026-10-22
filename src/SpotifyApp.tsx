@@ -510,7 +510,11 @@ export const SpotifyApp: React.FC = () => {
                   </div>
                   {history.length > 0 && (
                     <button
-                      onClick={() => setHistory([])}
+                      onClick={() => {
+                        setHistory([]);
+                        setSongs([]);
+                        setPlayedIds([]);
+                      }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-red-500/10 text-neutral-400 hover:text-red-400 border border-neutral-800 text-xs transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Hapus Riwayat
