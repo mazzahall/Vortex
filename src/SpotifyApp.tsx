@@ -44,6 +44,9 @@ export const SpotifyApp: React.FC = () => {
   const [history, setHistory] = useState<Song[]>(() => JSON.parse(localStorage.getItem('vortex_history') || '[]'));
   const [queue, setQueue] = useState<Song[]>([]);
 
+  // State untuk melacak ID lagu yang sudah diputar agar shuffle tidak berulang
+  const [playedIds, setPlayedIds] = useState<string[]>([]);
+
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<Song[]>([]);
@@ -117,6 +120,7 @@ export const SpotifyApp: React.FC = () => {
 
   const playSong = useCallback((song: Song) => {
     setHistory((prev) => [song, ...prev.filter((s) => s.id !== song.id)].slice(0, 20));
+    setPlayedIds((prev) => Array.from(new Set([...prev, song.id])));
 
     setSongs((prev) => {
       const existingIndex = prev.findIndex((s) => s.id === song.id);
@@ -146,6 +150,8 @@ export const SpotifyApp: React.FC = () => {
   }, [volume]);
 
   const playSongById = useCallback((videoId: string) => {
+    setPlayedIds((prev) => Array.from(new Set([...prev, videoId])));
+
     const triggerPlay = () => {
       if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
         playerRef.current.loadVideoById(videoId);
@@ -163,7 +169,7 @@ export const SpotifyApp: React.FC = () => {
     }
   }, [volume]);
 
-  // Tombol Next: Selalu memutar lagu acak (random)
+  // Tombol Next: Hanya memilih lagu acak yang BELUM pernah diputar
   const handleNext = useCallback(() => {
     if (queue.length > 0) {
       const nextQueueSong = queue[0];
@@ -179,15 +185,29 @@ export const SpotifyApp: React.FC = () => {
       return;
     }
 
-    // Pilih indeks acak dari daftar songs
-    const randomIdx = Math.floor(Math.random() * songs.length);
-    const targetSong = songs[randomIdx];
+    // Filter lagu yang belum tersimpan di playedIds
+    const unplayedSongs = songs.filter((s) => !playedIds.includes(s.id));
+
+    let targetSong: Song;
+    let chosenIndex: number;
+
+    if (unplayedSongs.length > 0) {
+      const randomIdx = Math.floor(Math.random() * unplayedSongs.length);
+      targetSong = unplayedSongs[randomIdx];
+      chosenIndex = songs.findIndex((s) => s.id === targetSong.id);
+    } else {
+      // Jika semua lagu sudah diputar, reset daftar dan mulai siklus acak baru
+      const randomIdx = Math.floor(Math.random() * songs.length);
+      targetSong = songs[randomIdx];
+      chosenIndex = randomIdx;
+      setPlayedIds([targetSong.id]);
+    }
 
     if (targetSong) {
-      setCurrentIndex(randomIdx);
+      setCurrentIndex(chosenIndex);
       playSongById(targetSong.id);
     }
-  }, [songs, repeatMode, currentSong, queue, playSong, playSongById]);
+  }, [songs, queue, playedIds, repeatMode, currentSong, playSong, playSongById]);
 
   const handlePrev = useCallback(() => {
     if (!songs || songs.length === 0) return;
@@ -268,7 +288,7 @@ export const SpotifyApp: React.FC = () => {
         }
       }
     }, 500);
-    return () => clearTimeout(interval);
+    return () => clearInterval(interval);
   }, [isPlaying]);
 
   return (
