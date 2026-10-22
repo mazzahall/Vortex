@@ -171,7 +171,7 @@ export const SpotifyApp: React.FC = () => {
       return;
     }
 
-    if (songs.length === 0) return;
+    if (!songs || songs.length === 0) return;
 
     if (repeatMode === 'one' && currentSong) {
       playSongById(currentSong.id);
@@ -180,21 +180,31 @@ export const SpotifyApp: React.FC = () => {
 
     if (isShuffle) {
       const randomIdx = Math.floor(Math.random() * songs.length);
-      setCurrentIndex(randomIdx);
-      if (songs[randomIdx]) playSongById(songs[randomIdx].id);
-    } else {
-      const nextIdx = (currentIndex + 1) % songs.length;
+      const targetSong = songs[randomIdx];
+      if (targetSong) {
+        setCurrentIndex(randomIdx);
+        playSongById(targetSong.id);
+      }
+      return;
+    }
+
+    const nextIdx = currentIndex < 0 ? 0 : (currentIndex + 1) % songs.length;
+    const targetSong = songs[nextIdx];
+    if (targetSong) {
       setCurrentIndex(nextIdx);
-      if (songs[nextIdx]) playSongById(songs[nextIdx].id);
+      playSongById(targetSong.id);
     }
   }, [songs, currentIndex, isShuffle, repeatMode, currentSong, queue, playSong, playSongById]);
 
   const handlePrev = useCallback(() => {
-    if (songs.length === 0) return;
+    if (!songs || songs.length === 0) return;
 
-    const prevIdx = (currentIndex - 1 + songs.length) % songs.length;
-    setCurrentIndex(prevIdx);
-    if (songs[prevIdx]) playSongById(songs[prevIdx].id);
+    const prevIdx = currentIndex <= 0 ? songs.length - 1 : currentIndex - 1;
+    const targetSong = songs[prevIdx];
+    if (targetSong) {
+      setCurrentIndex(prevIdx);
+      playSongById(targetSong.id);
+    }
   }, [songs, currentIndex, playSongById]);
 
   useEffect(() => {
