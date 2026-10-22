@@ -165,8 +165,8 @@ export const SpotifyApp: React.FC = () => {
     }
   }, [volume]);
 
-  // LOGIKA SHUFFLE BENAR-BENAR RANDOM
-  const handleNext = useCallback(() => {
+  // LOGIKA SHUFFLE BENAR-BENAR RANDOM DENGAN OTOMATIS CARI LAGU BARU DARI YOUTUBE
+  const handleNext = useCallback(async () => {
     // 1. Ambil dari antrean jika ada
     if (queue.length > 0) {
       const nextQueueSong = queue[0];
@@ -175,37 +175,48 @@ export const SpotifyApp: React.FC = () => {
       return;
     }
 
-    // Gabungkan seluruh sumber lagu yang ada (pencarian + riwayat + lagu tersimpan)
+    if (repeatMode === 'one' && currentSong) {
+      playSongById(currentSong.id);
+      return;
+    }
+
+    // Gabungkan seluruh sumber lagu lokal
     const poolMap = new Map<string, Song>();
     songs.forEach((s) => poolMap.set(s.id, s));
     searchResults.forEach((s) => poolMap.set(s.id, s));
     history.forEach((s) => poolMap.set(s.id, s));
 
     const pool = Array.from(poolMap.values());
-    if (pool.length === 0) return;
-
-    if (repeatMode === 'one' && currentSong) {
-      playSongById(currentSong.id);
-      return;
-    }
-
-    // Filter lagu yang BELUM PERNAH diputar
+    // Cari lagu yang BELUM PERNAH diputar
     const unplayedSongs = pool.filter((s) => !playedIds.includes(s.id));
 
-    let targetSong: Song;
-
     if (unplayedSongs.length > 0) {
+      // Pilih dari lagu lokal yang belum pernah didengar
       const randomIdx = Math.floor(Math.random() * unplayedSongs.length);
-      targetSong = unplayedSongs[randomIdx];
+      playSong(unplayedSongs[randomIdx]);
     } else {
-      // Jika semua sudah pernah diputar, reset dan acak ulang dari pool
-      const randomIdx = Math.floor(Math.random() * pool.length);
-      targetSong = pool[randomIdx];
-      setPlayedIds([targetSong.id]);
-    }
+      // Jika lagu lokal sudah habis/pernah diputar semua, OTOMATIS CARI LAGU BARU KE YOUTUBE
+      const queryKey = currentSong?.artist || MOOD_TAGS[Math.floor(Math.random() * MOOD_TAGS.length)];
+      try {
+        const fetchedResults = await searchSongs(`${queryKey} song`);
+        const newSongs = fetchedResults.map(toSong).filter((s) => !playedIds.includes(s.id));
 
-    if (targetSong) {
-      playSong(targetSong);
+        if (newSongs.length > 0) {
+          const pickedSong = newSongs[Math.floor(Math.random() * newSongs.length)];
+          playSong(pickedSong);
+        } else if (pool.length > 0) {
+          // Reset riwayat jika benar-benar tidak ada lagu baru dari API
+          const pickedSong = pool[Math.floor(Math.random() * pool.length)];
+          setPlayedIds([pickedSong.id]);
+          playSong(pickedSong);
+        }
+      } catch (err) {
+        console.error('Gagal mengambil lagu baru untuk shuffle:', err);
+        if (pool.length > 0) {
+          const pickedSong = pool[Math.floor(Math.random() * pool.length)];
+          playSong(pickedSong);
+        }
+      }
     }
   }, [queue, songs, searchResults, history, repeatMode, currentSong, playedIds, playSong, playSongById]);
 
@@ -274,7 +285,6 @@ export const SpotifyApp: React.FC = () => {
       const mapped = results.map(toSong);
       setSearchResults(mapped);
 
-      // Otomatis gabungkan lagu hasil pencarian ke daftar lagu utama
       setSongs((prev) => {
         const map = new Map<string, Song>();
         prev.forEach((s) => map.set(s.id, s));
