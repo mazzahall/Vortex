@@ -37,6 +37,32 @@ const toSong = (r: SongResult): Song => ({
   cover: r.thumbnail || `https://i.ytimg.com/vi/${r.id}/hqdefault.jpg`,
 });
 
+// Fungsi pembantu untuk mendeteksi suasana lagu dari judul/artis
+const detectSongMoodQuery = (song: Song | null): string => {
+  if (!song) return 'chill music';
+
+  const text = `${song.title} ${song.artist}`.toLowerCase();
+
+  if (text.match(/galau|sedih|sad|hurt|cry|broken|lonely|rindu|kangen|tears/i)) {
+    return `${song.artist} sad acoustic song`;
+  }
+  if (text.match(/pesta|party|dance|club|remix|dj|beat|energy|fun|happy|senang/i)) {
+    return `${song.artist} upbeat dance playlist`;
+  }
+  if (text.match(/santai|chill|lofi|relax|sleep|tidur|coffee|acoustic|akustik/i)) {
+    return `${song.artist} chill acoustic lofi`;
+  }
+  if (text.match(/love|romance|cinta|sayang|kasih|forever|wedding/i)) {
+    return `${song.artist} romantic love songs`;
+  }
+  if (text.match(/rock|metal|band|guitar|indie|alternative/i)) {
+    return `${song.artist} indie rock band music`;
+  }
+
+  // Default: Mencari lagu lain dari artis yang sama atau genre serupa
+  return `${song.artist} similar music playlist`;
+};
+
 export const SpotifyApp: React.FC = () => {
   const [songs, setSongs] = useState<Song[]>(() => JSON.parse(localStorage.getItem('vortex_songs') || '[]'));
   const [likedSongs, setLikedSongs] = useState<Song[]>(() => JSON.parse(localStorage.getItem('vortex_liked') || '[]'));
@@ -165,9 +191,9 @@ export const SpotifyApp: React.FC = () => {
     }
   }, [volume]);
 
-  // LOGIKA SHUFFLE BENAR-BENAR RANDOM DENGAN OTOMATIS CARI LAGU BARU DARI YOUTUBE
+  // LOGIKA SHUFFLE BERDASARKAN SUASANA (MOOD-BASED SHUFFLE)
   const handleNext = useCallback(async () => {
-    // 1. Ambil dari antrean jika ada
+    // 1. Cek antrean lagu
     if (queue.length > 0) {
       const nextQueueSong = queue[0];
       setQueue((prev) => prev.slice(1));
@@ -180,38 +206,35 @@ export const SpotifyApp: React.FC = () => {
       return;
     }
 
-    // Gabungkan seluruh sumber lagu lokal
+    // Gabungkan lagu lokal
     const poolMap = new Map<string, Song>();
     songs.forEach((s) => poolMap.set(s.id, s));
     searchResults.forEach((s) => poolMap.set(s.id, s));
     history.forEach((s) => poolMap.set(s.id, s));
 
     const pool = Array.from(poolMap.values());
-    // Cari lagu yang BELUM PERNAH diputar
     const unplayedSongs = pool.filter((s) => !playedIds.includes(s.id));
 
     if (unplayedSongs.length > 0) {
-      // Pilih dari lagu lokal yang belum pernah didengar
       const randomIdx = Math.floor(Math.random() * unplayedSongs.length);
       playSong(unplayedSongs[randomIdx]);
     } else {
-      // Jika lagu lokal sudah habis/pernah diputar semua, OTOMATIS CARI LAGU BARU KE YOUTUBE
-      const queryKey = currentSong?.artist || MOOD_TAGS[Math.floor(Math.random() * MOOD_TAGS.length)];
+      // Cari lagu acak dari YouTube SESUAI SUASANA LAGU SEKARANG
+      const moodQuery = detectSongMoodQuery(currentSong);
       try {
-        const fetchedResults = await searchSongs(`${queryKey} song`);
+        const fetchedResults = await searchSongs(moodQuery);
         const newSongs = fetchedResults.map(toSong).filter((s) => !playedIds.includes(s.id));
 
         if (newSongs.length > 0) {
           const pickedSong = newSongs[Math.floor(Math.random() * newSongs.length)];
           playSong(pickedSong);
         } else if (pool.length > 0) {
-          // Reset riwayat jika benar-benar tidak ada lagu baru dari API
           const pickedSong = pool[Math.floor(Math.random() * pool.length)];
           setPlayedIds([pickedSong.id]);
           playSong(pickedSong);
         }
       } catch (err) {
-        console.error('Gagal mengambil lagu baru untuk shuffle:', err);
+        console.error('Gagal mengambil lagu berdasarkan suasana:', err);
         if (pool.length > 0) {
           const pickedSong = pool[Math.floor(Math.random() * pool.length)];
           playSong(pickedSong);
