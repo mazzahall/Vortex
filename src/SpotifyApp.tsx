@@ -43,8 +43,6 @@ export const SpotifyApp: React.FC = () => {
   const [playlists, setPlaylists] = useState<Playlist[]>(() => JSON.parse(localStorage.getItem('vortex_playlists') || '[]'));
   const [history, setHistory] = useState<Song[]>(() => JSON.parse(localStorage.getItem('vortex_history') || '[]'));
   const [queue, setQueue] = useState<Song[]>([]);
-
-  // State untuk melacak ID lagu yang sudah diputar agar shuffle tidak berulang
   const [playedIds, setPlayedIds] = useState<string[]>([]);
 
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
@@ -123,13 +121,11 @@ export const SpotifyApp: React.FC = () => {
     setPlayedIds((prev) => Array.from(new Set([...prev, song.id])));
 
     setSongs((prev) => {
-      const existingIndex = prev.findIndex((s) => s.id === song.id);
-      if (existingIndex !== -1) {
-        setCurrentIndex(existingIndex);
-        return prev;
-      }
-      setCurrentIndex(0);
-      return [song, ...prev];
+      const exists = prev.some((s) => s.id === song.id);
+      const newSongs = exists ? prev : [song, ...prev];
+      const newIndex = newSongs.findIndex((s) => s.id === song.id);
+      setCurrentIndex(newIndex);
+      return newSongs;
     });
 
     const triggerPlay = () => {
@@ -169,8 +165,9 @@ export const SpotifyApp: React.FC = () => {
     }
   }, [volume]);
 
-  // Tombol Next: Hanya memilih lagu acak yang BELUM pernah diputar
+  // LOGIKA SHUFFLE BENAR-BENAR RANDOM
   const handleNext = useCallback(() => {
+    // 1. Ambil dari antrean jika ada
     if (queue.length > 0) {
       const nextQueueSong = queue[0];
       setQueue((prev) => prev.slice(1));
@@ -178,36 +175,39 @@ export const SpotifyApp: React.FC = () => {
       return;
     }
 
-    if (!songs || songs.length === 0) return;
+    // Gabungkan seluruh sumber lagu yang ada (pencarian + riwayat + lagu tersimpan)
+    const poolMap = new Map<string, Song>();
+    songs.forEach((s) => poolMap.set(s.id, s));
+    searchResults.forEach((s) => poolMap.set(s.id, s));
+    history.forEach((s) => poolMap.set(s.id, s));
+
+    const pool = Array.from(poolMap.values());
+    if (pool.length === 0) return;
 
     if (repeatMode === 'one' && currentSong) {
       playSongById(currentSong.id);
       return;
     }
 
-    // Filter lagu yang belum tersimpan di playedIds
-    const unplayedSongs = songs.filter((s) => !playedIds.includes(s.id));
+    // Filter lagu yang BELUM PERNAH diputar
+    const unplayedSongs = pool.filter((s) => !playedIds.includes(s.id));
 
     let targetSong: Song;
-    let chosenIndex: number;
 
     if (unplayedSongs.length > 0) {
       const randomIdx = Math.floor(Math.random() * unplayedSongs.length);
       targetSong = unplayedSongs[randomIdx];
-      chosenIndex = songs.findIndex((s) => s.id === targetSong.id);
     } else {
-      // Jika semua lagu sudah diputar, reset daftar dan mulai siklus acak baru
-      const randomIdx = Math.floor(Math.random() * songs.length);
-      targetSong = songs[randomIdx];
-      chosenIndex = randomIdx;
+      // Jika semua sudah pernah diputar, reset dan acak ulang dari pool
+      const randomIdx = Math.floor(Math.random() * pool.length);
+      targetSong = pool[randomIdx];
       setPlayedIds([targetSong.id]);
     }
 
     if (targetSong) {
-      setCurrentIndex(chosenIndex);
-      playSongById(targetSong.id);
+      playSong(targetSong);
     }
-  }, [songs, queue, playedIds, repeatMode, currentSong, playSong, playSongById]);
+  }, [queue, songs, searchResults, history, repeatMode, currentSong, playedIds, playSong, playSongById]);
 
   const handlePrev = useCallback(() => {
     if (!songs || songs.length === 0) return;
@@ -271,7 +271,16 @@ export const SpotifyApp: React.FC = () => {
 
     try {
       const results = await searchSongs(`${query} official audio`);
-      setSearchResults(results.map(toSong));
+      const mapped = results.map(toSong);
+      setSearchResults(mapped);
+
+      // Otomatis gabungkan lagu hasil pencarian ke daftar lagu utama
+      setSongs((prev) => {
+        const map = new Map<string, Song>();
+        prev.forEach((s) => map.set(s.id, s));
+        mapped.forEach((s) => map.set(s.id, s));
+        return Array.from(map.values());
+      });
     } catch (err) {
       console.error('Search gagal:', err);
     }
