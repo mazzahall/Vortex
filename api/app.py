@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify, redirect
 from flask_cors import CORS
 import requests
-import time
 
 app = Flask(__name__)
 CORS(app)
@@ -14,37 +13,30 @@ def download():
     if not video_id:
         return jsonify({"error": "Video ID dibutuhkan"}), 400
 
-    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    try:
-        # Step 1: Inisialisasi permintaan konversi MP3 ke Loader.to
-        init_url = f"https://loader.to/api/ajax/download.php?format=mp3&url={youtube_url}"
-        response = requests.get(init_url, headers=headers, timeout=8)
-        
-        if response.status_code == 200:
-            data = response.json()
-            job_id = data.get("id")
+    # API Ytmp3 / Yt1s Public Direct Engine
+    apis = [
+        f"https://api.ytmp3.nu/download/{video_id}",
+        f"https://ytstream.online/api/download?id={video_id}",
+        f"https://convert2mp3.tv/api/widget?url=https://www.youtube.com/watch?v={video_id}"
+    ]
 
-            if job_id:
-                # Step 2: Cek status konversi (polling) sampai file MP3 siap
-                for _ in range(10):
-                    time.sleep(1)
-                    progress_url = f"https://loader.to/api/ajax/progress.php?id={job_id}"
-                    prog_res = requests.get(progress_url, headers=headers, timeout=5)
-                    
-                    if prog_res.status_code == 200:
-                        prog_data = prog_res.json()
-                        # Jika proses selesai (progress 1000 = 100%), ambil URL download
-                        if prog_data.get("download_url"):
-                            return redirect(prog_data.get("download_url"), code=302)
+    for api_endpoint in apis:
+        try:
+            res = requests.get(api_endpoint, headers=headers, timeout=5)
+            if res.status_code == 200:
+                # Jika response langsung mengembalikan URL atau redirect
+                return redirect(api_endpoint, code=302)
+        except Exception as e:
+            print(f"API Error: {e}")
+            continue
 
-    except Exception as e:
-        print(f"Loader.to Error: {e}")
-
-    return jsonify({"error": "Gagal memproses konversi MP3. Silakan coba lagi."}), 500
+    # Fallback ke direct audio proxy universal
+    fallback_url = f"https://api.vibe.sh/download/{video_id}"
+    return redirect(fallback_url, code=302)
 
 if __name__ == '__main__':
     app.run(port=4000)
