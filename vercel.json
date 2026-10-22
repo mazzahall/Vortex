@@ -13,18 +13,21 @@
       "use": "@vercel/python"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/search",
-      "destination": "/api/search.ts"
+      "src": "/api/search",
+      "dest": "/api/search.ts"
     },
     {
-      "source": "/api/download",
-      "destination": "/api/app.py"
+      "src": "/api/download(.*)",
+      "dest": "/api/app.py"
     },
     {
-      "source": "/((?!api/|assets/|.*\\..*).*)",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
