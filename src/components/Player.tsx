@@ -22,6 +22,12 @@ import {
   Disc
 } from 'lucide-react';
 
+interface InvidiousFormat {
+  type: string;
+  url: string;
+  [key: string]: unknown;
+}
+
 interface PlayerProps {
   currentSong: Song | null;
   isPlaying: boolean;
@@ -46,6 +52,12 @@ interface PlayerProps {
   onToggleLyrics: () => void;
   onToggleQueue: () => void;
   onToggleFullscreen: () => void;
+  onStartMix?: (song: Song) => void;
+  onPlayNext?: (song: Song) => void;
+  onAddToQueue?: (song: Song) => void;
+  onSaveToLibrary?: (song: Song) => void;
+  onAddToPlaylist?: (song: Song) => void;
+  onOpenAlbum?: (song: Song) => void;
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -68,6 +80,12 @@ export const Player: React.FC<PlayerProps> = ({
   onToggleRepeat,
   onToggleLike,
   onToggleFullscreen,
+  onStartMix,
+  onPlayNext,
+  onAddToQueue,
+  onSaveToLibrary,
+  onAddToPlaylist,
+  onOpenAlbum,
 }) => {
   const [showMenu, setShowMenu] = useState<boolean>(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState<boolean>(false);
@@ -79,36 +97,43 @@ export const Player: React.FC<PlayerProps> = ({
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const handleDownload = async () => {
+  const handleDownloadToLaptop = async () => {
     if (!currentSong) return;
     setShowMenu(false);
     setIsDownloading(true);
 
     try {
-      let audioSrc = currentSong.audioUrl;
+      let downloadUrl = currentSong.audioUrl;
 
-      if (!audioSrc && currentSong.id) {
-        const response = await fetch('https://api.cobalt.tools/api/json', {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            url: `https://www.youtube.com/watch?v=${currentSong.id}`,
-            isAudioOnly: true,
-            aFormat: 'mp3'
-          })
-        });
-        const data = await response.json();
-        if (data.url) {
-          audioSrc = data.url;
+      if (!downloadUrl && currentSong.id) {
+        const invidiousInstances = [
+          'https://inv.riverside.rocks',
+          'https://invidious.nerdvpn.de',
+          'https://invidious.drgns.space'
+        ];
+
+        for (const instance of invidiousInstances) {
+          try {
+            const res = await fetch(`${instance}/api/v1/videos/${currentSong.id}`);
+            if (res.ok) {
+              const data = await res.json();
+              const audioFormat = data.adaptiveFormats?.find((f: InvidiousFormat) => 
+                f.type.includes('audio')
+              );
+              if (audioFormat?.url) {
+                downloadUrl = audioFormat.url;
+                break;
+              }
+            }
+          } catch {
+            continue;
+          }
         }
       }
 
-      if (audioSrc) {
-        const res = await fetch(audioSrc);
-        const blob = await res.blob();
+      if (downloadUrl) {
+        const response = await fetch(downloadUrl);
+        const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
 
         const a = document.createElement('a');
@@ -119,11 +144,11 @@ export const Player: React.FC<PlayerProps> = ({
         document.body.removeChild(a);
         URL.revokeObjectURL(blobUrl);
       } else {
-        alert('Gagal mengambil link audio.');
+        alert('Gagal mengambil file audio lagu ini.');
       }
     } catch (err) {
       console.error('Download error:', err);
-      alert('Terjadi kesalahan saat mengunduh lagu.');
+      alert('Gagal mengunduh lagu ke laptop.');
     } finally {
       setIsDownloading(false);
     }
@@ -136,7 +161,7 @@ export const Player: React.FC<PlayerProps> = ({
   return (
     <footer className="h-16 bg-[#181818] text-white flex items-center justify-between z-40 relative select-none border-t border-neutral-800/50">
       
-      {/* 1. Progress Bar Merah Persis di Batas Atas Bar */}
+      {/* Progress Bar Merah */}
       <div 
         className="absolute top-0 left-0 right-0 h-1 bg-neutral-700/60 cursor-pointer group z-50"
         onClick={(e) => {
@@ -150,14 +175,13 @@ export const Player: React.FC<PlayerProps> = ({
           className="h-full bg-red-600 relative transition-all duration-75"
           style={{ width: `${progressPercent}%` }}
         >
-          {/* Dot/Knob Merah */}
           <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-red-600 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       </div>
 
       <div className="w-full px-6 flex items-center justify-between">
         
-        {/* 2. Sisi Kiri: Controls (Prev, Play, Next) & Waktu */}
+        {/* Controls Kiri */}
         <div className="flex items-center gap-5">
           <button 
             onClick={onPrev} 
@@ -187,13 +211,12 @@ export const Player: React.FC<PlayerProps> = ({
             <SkipForward className="w-5 h-5 fill-current" />
           </button>
 
-          {/* Format Waktu */}
           <span className="text-xs text-neutral-400 font-normal tracking-wide ml-2">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
         </div>
 
-        {/* 3. Sisi Tengah: Detail Lagu (Cover, Judul, Artis, Thumbs Up/Down, Dots) */}
+        {/* Detail Lagu Tengah */}
         <div className="flex items-center gap-4 max-w-xl truncate px-4">
           <img 
             src={currentSong.cover} 
@@ -231,6 +254,15 @@ export const Player: React.FC<PlayerProps> = ({
               <ThumbsDown className="w-4 h-4" />
             </button>
 
+            <button 
+              onClick={handleDownloadToLaptop}
+              disabled={isDownloading}
+              className="p-1.5 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition disabled:opacity-50"
+              title="Download MP3 ke Laptop"
+            >
+              <Download className="w-4 h-4 text-red-500" />
+            </button>
+
             <div className="relative">
               <button 
                 onClick={() => setShowMenu(!showMenu)}
@@ -245,35 +277,59 @@ export const Player: React.FC<PlayerProps> = ({
                   className="absolute bottom-12 left-1/2 -translate-x-1/2 w-56 bg-[#212121] border border-neutral-800 rounded-2xl shadow-2xl z-50 py-2 text-sm text-neutral-200 font-medium"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                  <button 
+                    onClick={() => { setShowMenu(false); onStartMix?.(currentSong); }} 
+                    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
+                  >
                     <Radio className="w-4 h-4 text-neutral-300" />
                     <span>Mulai mix</span>
                   </button>
-                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+
+                  <button 
+                    onClick={() => { setShowMenu(false); onPlayNext?.(currentSong); }} 
+                    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
+                  >
                     <PlaySquare className="w-4 h-4 text-neutral-300" />
                     <span>Putar setelah ini</span>
                   </button>
-                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+
+                  <button 
+                    onClick={() => { setShowMenu(false); onAddToQueue?.(currentSong); }} 
+                    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
+                  >
                     <ListPlus className="w-4 h-4 text-neutral-300" />
                     <span>Tambahkan ke antrean</span>
                   </button>
-                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+
+                  <button 
+                    onClick={() => { setShowMenu(false); onSaveToLibrary?.(currentSong); }} 
+                    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
+                  >
                     <Bookmark className="w-4 h-4 text-neutral-300" />
                     <span>Simpan ke koleksi</span>
                   </button>
+
                   <button 
-                    onClick={handleDownload} 
+                    onClick={handleDownloadToLaptop} 
                     disabled={isDownloading}
-                    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left disabled:opacity-50"
+                    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left disabled:opacity-50 text-red-500 font-semibold"
                   >
-                    <Download className="w-4 h-4 text-neutral-300" />
+                    <Download className="w-4 h-4 text-red-500" />
                     <span>{isDownloading ? 'Mengunduh...' : 'Download'}</span>
                   </button>
-                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+
+                  <button 
+                    onClick={() => { setShowMenu(false); onAddToPlaylist?.(currentSong); }} 
+                    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
+                  >
                     <FolderPlus className="w-4 h-4 text-neutral-300" />
                     <span>Simpan ke playlist</span>
                   </button>
-                  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+
+                  <button 
+                    onClick={() => { setShowMenu(false); onOpenAlbum?.(currentSong); }} 
+                    className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left"
+                  >
                     <Disc className="w-4 h-4 text-neutral-300" />
                     <span>Buka album</span>
                   </button>
@@ -283,10 +339,8 @@ export const Player: React.FC<PlayerProps> = ({
           </div>
         </div>
 
-        {/* 4. Sisi Kanan: Volume, Repeat, Shuffle, Expand Arrow */}
+        {/* Volume & Additional Kanan */}
         <div className="flex items-center gap-4 relative">
-          
-          {/* Slider Volume Popover / Inline */}
           <div 
             className="relative flex items-center"
             onMouseEnter={() => setShowVolumeSlider(true)}
@@ -345,7 +399,6 @@ export const Player: React.FC<PlayerProps> = ({
           >
             <ChevronUp className="w-5 h-5" />
           </button>
-
         </div>
 
       </div>
