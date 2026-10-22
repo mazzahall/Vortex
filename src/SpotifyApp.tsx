@@ -53,7 +53,7 @@ export const SpotifyApp: React.FC = () => {
 
   const [volume, setVolume] = useState<number>(80);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [isShuffle, setIsShuffle] = useState<boolean>(false);
+  const [isShuffle, setIsShuffle] = useState<boolean>(true);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
@@ -163,6 +163,7 @@ export const SpotifyApp: React.FC = () => {
     }
   }, [volume]);
 
+  // Tombol Next: Selalu memutar lagu acak (random)
   const handleNext = useCallback(() => {
     if (queue.length > 0) {
       const nextQueueSong = queue[0];
@@ -178,23 +179,15 @@ export const SpotifyApp: React.FC = () => {
       return;
     }
 
-    if (isShuffle) {
-      const randomIdx = Math.floor(Math.random() * songs.length);
-      const targetSong = songs[randomIdx];
-      if (targetSong) {
-        setCurrentIndex(randomIdx);
-        playSongById(targetSong.id);
-      }
-      return;
-    }
+    // Pilih indeks acak dari daftar songs
+    const randomIdx = Math.floor(Math.random() * songs.length);
+    const targetSong = songs[randomIdx];
 
-    const nextIdx = currentIndex < 0 ? 0 : (currentIndex + 1) % songs.length;
-    const targetSong = songs[nextIdx];
     if (targetSong) {
-      setCurrentIndex(nextIdx);
+      setCurrentIndex(randomIdx);
       playSongById(targetSong.id);
     }
-  }, [songs, currentIndex, isShuffle, repeatMode, currentSong, queue, playSong, playSongById]);
+  }, [songs, repeatMode, currentSong, queue, playSong, playSongById]);
 
   const handlePrev = useCallback(() => {
     if (!songs || songs.length === 0) return;
@@ -275,7 +268,7 @@ export const SpotifyApp: React.FC = () => {
         }
       }
     }, 500);
-    return () => clearInterval(interval);
+    return () => clearTimeout(interval);
   }, [isPlaying]);
 
   return (
