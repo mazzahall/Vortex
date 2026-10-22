@@ -5,13 +5,21 @@
       "use": "@vercel/static-build"
     },
     {
+      "src": "api/search.ts",
+      "use": "@vercel/node"
+    },
+    {
       "src": "server/app.py",
       "use": "@vercel/python"
     }
   ],
   "rewrites": [
     {
-      "source": "/api/(.*)",
+      "source": "/api/search",
+      "destination": "/api/search.ts"
+    },
+    {
+      "source": "/api/download",
       "destination": "/server/app.py"
     },
     {
