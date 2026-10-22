@@ -9,14 +9,14 @@
       "use": "@vercel/python"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "server/app.py"
+      "source": "/api/(.*)",
+      "destination": "/server/app.py"
     },
     {
-      "src": "/((?!api/).*)",
-      "dest": "/index.html"
+      "source": "/((?!api/|assets/|.*\\..*).*)",
+      "destination": "/index.html"
     }
   ]
 }
