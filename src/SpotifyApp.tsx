@@ -12,7 +12,9 @@ import {
   Cast, 
   LogOut, 
   LogIn,
-  X
+  X,
+  Play,
+  Clock
 } from 'lucide-react';
 
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
@@ -37,7 +39,6 @@ const toSong = (r: SongResult): Song => ({
   cover: r.thumbnail || `https://i.ytimg.com/vi/${r.id}/hqdefault.jpg`,
 });
 
-// Fungsi pembantu untuk mendeteksi suasana lagu dari judul/artis
 const detectSongMoodQuery = (song: Song | null): string => {
   if (!song) return 'chill music';
 
@@ -59,7 +60,6 @@ const detectSongMoodQuery = (song: Song | null): string => {
     return `${song.artist} indie rock band music`;
   }
 
-  // Default: Mencari lagu lain dari artis yang sama atau genre serupa
   return `${song.artist} similar music playlist`;
 };
 
@@ -143,7 +143,7 @@ export const SpotifyApp: React.FC = () => {
   }, [searchQuery]);
 
   const playSong = useCallback((song: Song) => {
-    setHistory((prev) => [song, ...prev.filter((s) => s.id !== song.id)].slice(0, 20));
+    setHistory((prev) => [song, ...prev.filter((s) => s.id !== song.id)].slice(0, 50));
     setPlayedIds((prev) => Array.from(new Set([...prev, song.id])));
 
     setSongs((prev) => {
@@ -191,9 +191,7 @@ export const SpotifyApp: React.FC = () => {
     }
   }, [volume]);
 
-  // LOGIKA SHUFFLE BERDASARKAN SUASANA (MOOD-BASED SHUFFLE)
   const handleNext = useCallback(async () => {
-    // 1. Cek antrean lagu
     if (queue.length > 0) {
       const nextQueueSong = queue[0];
       setQueue((prev) => prev.slice(1));
@@ -206,7 +204,6 @@ export const SpotifyApp: React.FC = () => {
       return;
     }
 
-    // Gabungkan lagu lokal
     const poolMap = new Map<string, Song>();
     songs.forEach((s) => poolMap.set(s.id, s));
     searchResults.forEach((s) => poolMap.set(s.id, s));
@@ -219,7 +216,6 @@ export const SpotifyApp: React.FC = () => {
       const randomIdx = Math.floor(Math.random() * unplayedSongs.length);
       playSong(unplayedSongs[randomIdx]);
     } else {
-      // Cari lagu acak dari YouTube SESUAI SUASANA LAGU SEKARANG
       const moodQuery = detectSongMoodQuery(currentSong);
       try {
         const fetchedResults = await searchSongs(moodQuery);
@@ -499,6 +495,57 @@ export const SpotifyApp: React.FC = () => {
                   if (q) searchYouTube(q);
                 }}
               />
+            )}
+
+            {/* HALAMAN RIWAYAT PUTAR (HISTORY) */}
+            {activeTab === 'history' && (
+              <div className="flex flex-col gap-6">
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <Clock className="w-6 h-6 text-red-500" />
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">Riwayat Putar</h2>
+                      <p className="text-xs text-neutral-400">{history.length} lagu terakhir diputar</p>
+                    </div>
+                  </div>
+                  {history.length > 0 && (
+                    <button
+                      onClick={() => setHistory([])}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-red-500/10 text-neutral-400 hover:text-red-400 border border-neutral-800 text-xs transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Hapus Riwayat
+                    </button>
+                  )}
+                </div>
+
+                {history.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-neutral-500 gap-3">
+                    <Clock className="w-12 h-12 stroke-1" />
+                    <p className="text-sm">Belum ada lagu yang pernah diputar</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {history.map((s, idx) => (
+                      <div
+                        key={`hist-${s.id}-${idx}`}
+                        onClick={() => playSong(s)}
+                        className="flex items-center gap-3 p-2.5 rounded-xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800/60 cursor-pointer group transition"
+                      >
+                        <div className="relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden">
+                          <img src={s.cover} alt={s.title} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                            <Play className="w-5 h-5 fill-white text-white" />
+                          </div>
+                        </div>
+                        <div className="truncate flex-1">
+                          <p className="text-sm font-medium text-white truncate group-hover:text-red-400 transition">{s.title}</p>
+                          <p className="text-xs text-neutral-400 truncate">{s.artist}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
             {activeTab === 'lyrics' && (

@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import type { Playlist } from '../types/music';
 import { 
   Home, 
   Search, 
   Heart, 
+  Clock, 
+  Music2, 
   Plus, 
   Trash2, 
-  PanelLeft, 
-  ListMusic 
+  Library,
+  ListMusic
 } from 'lucide-react';
+import type { Playlist } from '../types/music';
 
 interface SidebarProps {
   likedCount: number;
@@ -27,151 +29,153 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCreatePlaylist,
   onDeletePlaylist,
 }) => {
-  const [isExpanded, setIsExpanded] = useState<boolean>(true);
-  const [newPlaylistName, setNewPlaylistName] = useState<string>('');
-  const [showInput, setShowInput] = useState<boolean>(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
-  const handleCreatePlaylist = (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPlaylistName.trim()) {
       onCreatePlaylist(newPlaylistName.trim());
       setNewPlaylistName('');
-      setShowInput(false);
+      setIsCreating(false);
     }
   };
 
   return (
-    <aside
-      className={`bg-black border-r border-neutral-900 h-full flex flex-col justify-between transition-all duration-300 p-4 select-none ${
-        isExpanded ? 'w-64' : 'w-20'
-      }`}
-    >
-      <div className="space-y-6">
-        {/* Header Logo & Tombol Toggle Expand/Collapse (Ikon PanelLeft) */}
-        <div className="flex items-center gap-3 px-2 py-1">
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="p-2 text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-900 transition flex-shrink-0"
-            title={isExpanded ? 'Sembunyikan Sidebar' : 'Tampilkan Sidebar'}
-          >
-            <PanelLeft className="w-5 h-5" />
-          </button>
-
-          {isExpanded && (
-            <div
-              onClick={() => setActiveTab('home')}
-              className="flex items-center gap-3 cursor-pointer overflow-hidden whitespace-nowrap"
-            >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-purple-600/30 flex-shrink-0">
-                <ListMusic className="w-4 h-4" />
-              </div>
-              <div className="truncate">
-                <h1 className="text-base font-extrabold text-white tracking-wider">VORTEX</h1>
-              </div>
-            </div>
-          )}
+    <aside className="w-64 bg-black border-r border-neutral-900 flex flex-col justify-between select-none h-full p-4 gap-6">
+      <div className="flex flex-col gap-6">
+        {/* Logo / Brand Name */}
+        <div className="flex items-center gap-3 px-2 pt-2">
+          <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center">
+            <Music2 className="w-5 h-5 text-white" />
+          </div>
+          <span className="font-extrabold text-xl tracking-tight text-white">VORTEX</span>
         </div>
 
-        {/* Menu Navigasi */}
-        <nav className="space-y-1">
+        {/* Menu Navigasi Utama */}
+        <nav className="flex flex-col gap-1">
           <button
             onClick={() => setActiveTab('home')}
-            className={`w-full flex items-center gap-4 px-3.5 py-3 rounded-2xl font-medium text-sm transition ${
+            className={`flex items-center gap-4 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
               activeTab === 'home'
-                ? 'bg-neutral-800/90 text-white font-semibold'
-                : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60'
-            } ${!isExpanded ? 'justify-center' : ''}`}
-            title="Beranda"
+                ? 'bg-neutral-900 text-white'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
+            }`}
           >
-            <Home className="w-5 h-5 flex-shrink-0" />
-            {isExpanded && <span className="truncate">Beranda</span>}
+            <Home className="w-5 h-5" />
+            <span>Utama</span>
           </button>
 
           <button
             onClick={() => setActiveTab('search')}
-            className={`w-full flex items-center gap-4 px-3.5 py-3 rounded-2xl font-medium text-sm transition ${
+            className={`flex items-center gap-4 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
               activeTab === 'search'
-                ? 'bg-neutral-800/90 text-white font-semibold'
-                : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60'
-            } ${!isExpanded ? 'justify-center' : ''}`}
-            title="Jelajah Musik"
+                ? 'bg-neutral-900 text-white'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
+            }`}
           >
-            <Search className="w-5 h-5 flex-shrink-0" />
-            {isExpanded && <span className="truncate">Jelajah Musik</span>}
+            <Search className="w-5 h-5" />
+            <span>Telusuri</span>
           </button>
 
           <button
             onClick={() => setActiveTab('liked')}
-            className={`w-full flex items-center gap-4 px-3.5 py-3 rounded-2xl font-medium text-sm transition ${
+            className={`flex items-center gap-4 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
               activeTab === 'liked'
-                ? 'bg-neutral-800/90 text-white font-semibold'
-                : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60'
-            } ${!isExpanded ? 'justify-center' : ''}`}
-            title="Lagu Disukai"
+                ? 'bg-neutral-900 text-white'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
+            }`}
           >
-            <Heart className="w-5 h-5 flex-shrink-0 text-pink-500" />
-            {isExpanded && (
-              <span className="truncate">Lagu Disukai ({likedCount})</span>
-            )}
+            <Heart className="w-5 h-5 text-red-500 fill-red-500/20" />
+            <div className="flex items-center justify-between flex-1">
+              <span>Lagu Disukai</span>
+              {likedCount > 0 && (
+                <span className="text-xs bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded-full">
+                  {likedCount}
+                </span>
+              )}
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex items-center gap-4 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
+              activeTab === 'history'
+                ? 'bg-neutral-900 text-white'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
+            }`}
+          >
+            <Clock className="w-5 h-5 text-neutral-400" />
+            <span>Riwayat Putar</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('lyrics')}
+            className={`flex items-center gap-4 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
+              activeTab === 'lyrics'
+                ? 'bg-neutral-900 text-white'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
+            }`}
+          >
+            <ListMusic className="w-5 h-5" />
+            <span>Lirik Lagu</span>
           </button>
         </nav>
 
-        {/* Section Playlist Kamu */}
-        <div className="pt-4 border-t border-neutral-900 space-y-3">
-          <div className={`flex items-center ${isExpanded ? 'justify-between px-2' : 'justify-center'}`}>
-            {isExpanded && (
-              <span className="text-xs font-bold text-neutral-400 tracking-wider uppercase">
-                Playlist Kamu
-              </span>
-            )}
+        {/* Bagian Playlist */}
+        <div className="flex flex-col gap-3 pt-4 border-t border-neutral-900">
+          <div className="flex items-center justify-between px-2">
+            <div className="flex items-center gap-2 text-neutral-400">
+              <Library className="w-4 h-4" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Koleksi Playlist</span>
+            </div>
             <button
-              onClick={() => {
-                if (!isExpanded) setIsExpanded(true);
-                setShowInput(!showInput);
-              }}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-900 transition"
-              title="Buat Playlist Baru"
+              onClick={() => setIsCreating(!isCreating)}
+              className="p-1 hover:bg-neutral-900 text-neutral-400 hover:text-white rounded-lg transition"
+              title="Buat Playlist"
             >
               <Plus className="w-4 h-4" />
             </button>
           </div>
 
-          {showInput && isExpanded && (
-            <form onSubmit={handleCreatePlaylist} className="px-1">
+          {/* Form Buat Playlist Baru */}
+          {isCreating && (
+            <form onSubmit={handleCreate} className="flex gap-2">
               <input
                 type="text"
                 placeholder="Nama playlist..."
                 value={newPlaylistName}
                 onChange={(e) => setNewPlaylistName(e.target.value)}
                 autoFocus
-                className="w-full bg-neutral-900 border border-neutral-800 text-xs text-white rounded-xl px-3 py-2 focus:outline-none focus:border-purple-500/50"
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-700"
               />
             </form>
           )}
 
           {/* Daftar Playlist */}
-          {isExpanded && (
-            <div className="space-y-1 max-h-48 overflow-y-auto scrollbar-none">
-              {playlists.map((pl) => (
+          <div className="flex flex-col gap-1 max-h-48 overflow-y-auto scrollbar-none">
+            {playlists.length === 0 ? (
+              <p className="text-xs text-neutral-600 italic px-2 py-1">Belum ada playlist</p>
+            ) : (
+              playlists.map((pl) => (
                 <div
                   key={pl.id}
-                  className="flex items-center justify-between group px-3 py-2 rounded-xl hover:bg-neutral-900/60 transition cursor-pointer text-xs text-neutral-300 hover:text-white"
+                  className="group flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-neutral-900/80 cursor-pointer text-xs text-neutral-400 hover:text-white transition"
                 >
-                  <span className="truncate font-medium">{pl.name}</span>
+                  <span className="truncate">{pl.name}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onDeletePlaylist(pl.id);
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-neutral-500 hover:text-red-400 transition"
-                    title="Hapus Playlist"
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </div>
       </div>
     </aside>
