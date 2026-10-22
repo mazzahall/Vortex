@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Song } from '../types/music';
+import { downloadSong } from '../utils/download';
 import { 
   MoreVertical, 
   Radio, 
@@ -10,12 +11,6 @@ import {
   FolderPlus, 
   Disc 
 } from 'lucide-react';
-
-interface InvidiousFormat {
-  type: string;
-  url: string;
-  [key: string]: unknown;
-}
 
 interface SongMenuProps {
   song: Song;
@@ -45,52 +40,9 @@ export const SongMenu: React.FC<SongMenuProps> = ({
     setIsDownloading(true);
 
     try {
-      let downloadUrl = song.audioUrl;
-
-      if (!downloadUrl && song.id) {
-        const invidiousInstances = [
-          'https://inv.riverside.rocks',
-          'https://invidious.nerdvpn.de',
-          'https://invidious.drgns.space'
-        ];
-
-        for (const instance of invidiousInstances) {
-          try {
-            const res = await fetch(`${instance}/api/v1/videos/${song.id}`);
-            if (res.ok) {
-              const data = await res.json();
-              const audioFormat = data.adaptiveFormats?.find((f: InvidiousFormat) => 
-                f.type.includes('audio')
-              );
-              if (audioFormat?.url) {
-                downloadUrl = audioFormat.url;
-                break;
-              }
-            }
-          } catch {
-            continue;
-          }
-        }
-      }
-
-      if (downloadUrl) {
-        const response = await fetch(downloadUrl);
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `${song.title} - ${song.artist}.mp3`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      } else {
-        alert('Gagal mengambil file audio lagu ini.');
-      }
+      await downloadSong(song.id, `${song.title} - ${song.artist}`);
     } catch (err) {
       console.error('Download error:', err);
-      alert('Gagal mengunduh lagu.');
     } finally {
       setIsDownloading(false);
     }
