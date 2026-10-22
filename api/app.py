@@ -5,11 +5,13 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-# Daftar instance Invidious publik sebagai cadangan jika salah satu offline
+# Daftar instance Invidious publik yang lebih stabil & aktif
 INVIDIOUS_INSTANCES = [
-    "https://inv.projectsegfau.lt",
-    "https://invidious.nerdvpn.de",
-    "https://invidious.drgns.space"
+    "https://inv.us.projectsegfau.lt",
+    "https://invidious.flokinet.to",
+    "https://invidious.privacydev.net",
+    "https://inv.tux.im",
+    "https://invidious.no-commercial.pro"
 ]
 
 @app.route('/api/download', methods=['GET'])
@@ -20,31 +22,35 @@ def download():
     if not video_id:
         return jsonify({"error": "Video ID dibutuhkan"}), 400
 
-    # Cari audio stream URL lewat instance Invidious
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
     for instance in INVIDIOUS_INSTANCES:
         try:
             api_url = f"{instance}/api/v1/videos/{video_id}"
-            response = requests.get(api_url, timeout=5)
+            response = requests.get(api_url, headers=headers, timeout=5)
 
             if response.status_code == 200:
                 data = response.json()
                 adaptive_formats = data.get('adaptiveFormats', [])
 
-                # Filter khusus format audio saja
+                # Filter khusus stream audio
                 audio_streams = [
                     f for f in adaptive_formats 
                     if f.get('type', '').startswith('audio/')
                 ]
 
                 if audio_streams:
-                    # Ambil stream audio dengan kualitas terbaik
+                    # Urutkan berdasarkan bitrate tertinggi
+                    audio_streams.sort(key=lambda x: int(x.get('bitrate', 0)), reverse=True)
                     stream_url = audio_streams[0].get('url')
                     return redirect(stream_url, code=302)
         except Exception as e:
             print(f"Gagal konek ke {instance}: {e}")
             continue
 
-    return jsonify({"error": "Gagal mengambil stream audio dari Invidious"}), 500
+    return jsonify({"error": "Semua instance Invidious gagal merespons, coba beberapa saat lagi"}), 500
 
 if __name__ == '__main__':
     app.run(port=4000)
