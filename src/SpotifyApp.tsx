@@ -3,7 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { HomeView } from './components/HomeView';
 import { SearchView } from './components/SearchView';
 import { LyricsView } from './components/LyricsView';
-import { Player } from './components/Player';
+import Player from './components/Player';
 import type { Song, Playlist, YTPlayer, YTEvent } from './types/music';
 import { 
   Minimize2, 
@@ -24,7 +24,6 @@ const MOOD_TAGS = [
   'Bersantai', 'Senang', 'Sedih', 'Romansa', 'Perjalanan', 'Mengisi energi', 'Pesta', 'Olahraga', 'Tidur'
 ];
 
-// YouTube API mengirim teks dengan HTML entity (&amp; &#39; dll), jadi di-decode dulu
 const decodeHtml = (s: string) => {
   const el = document.createElement('textarea');
   el.innerHTML = s;
@@ -45,7 +44,7 @@ export const SpotifyApp: React.FC = () => {
   const [history, setHistory] = useState<Song[]>(() => JSON.parse(localStorage.getItem('vortex_history') || '[]'));
   const [queue, setQueue] = useState<Song[]>([]);
 
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<Song[]>([]);
   const [activeTab, setActiveTab] = useState<string>('home');
@@ -59,20 +58,19 @@ export const SpotifyApp: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
 
-  // Search & Suggestion States
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
-  // Firebase State
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   const playerRef = useRef<YTPlayer | null>(null);
   const isReadyRef = useRef<boolean>(false);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
-  const currentSong = songs[currentIndex] || null;
+
+  const currentSong = currentIndex >= 0 && songs[currentIndex] ? songs[currentIndex] : null;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -86,7 +84,6 @@ export const SpotifyApp: React.FC = () => {
   useEffect(() => { localStorage.setItem('vortex_playlists', JSON.stringify(playlists)); }, [playlists]);
   useEffect(() => { localStorage.setItem('vortex_history', JSON.stringify(history)); }, [history]);
 
-  // Tutup dropdown suggestions jika klik di luar search bar
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
@@ -97,7 +94,6 @@ export const SpotifyApp: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Saran teks saat mengetik (tidak memanggil API, jadi kuota YouTube aman)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!searchQuery.trim()) {
@@ -121,22 +117,6 @@ export const SpotifyApp: React.FC = () => {
 
   const playSong = useCallback((song: Song) => {
     setHistory((prev) => [song, ...prev.filter((s) => s.id !== song.id)].slice(0, 20));
-    
-    if (playerRef.current && isReadyRef.current) {
-      if (typeof playerRef.current.loadVideoById === 'function') {
-        playerRef.current.loadVideoById(song.id);
-        playerRef.current.playVideo();
-      }
-      setIsPlaying(true);
-    } else {
-      setTimeout(() => {
-        if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
-          playerRef.current.loadVideoById(song.id);
-          playerRef.current.playVideo();
-          setIsPlaying(true);
-        }
-      }, 200);
-    }
 
     setSongs((prev) => {
       const existingIndex = prev.findIndex((s) => s.id === song.id);
@@ -147,25 +127,41 @@ export const SpotifyApp: React.FC = () => {
       setCurrentIndex(0);
       return [song, ...prev];
     });
-  }, []);
+
+    const triggerPlay = () => {
+      if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
+        playerRef.current.loadVideoById(song.id);
+        if (typeof playerRef.current.unMute === 'function') playerRef.current.unMute();
+        if (typeof playerRef.current.setVolume === 'function') playerRef.current.setVolume(volume);
+        playerRef.current.playVideo();
+        setIsPlaying(true);
+      }
+    };
+
+    if (playerRef.current && isReadyRef.current) {
+      triggerPlay();
+    } else {
+      setTimeout(triggerPlay, 300);
+    }
+  }, [volume]);
 
   const playSongById = useCallback((videoId: string) => {
-    if (playerRef.current && isReadyRef.current) {
-      if (typeof playerRef.current.loadVideoById === 'function') {
+    const triggerPlay = () => {
+      if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
         playerRef.current.loadVideoById(videoId);
+        if (typeof playerRef.current.unMute === 'function') playerRef.current.unMute();
+        if (typeof playerRef.current.setVolume === 'function') playerRef.current.setVolume(volume);
         playerRef.current.playVideo();
+        setIsPlaying(true);
       }
-      setIsPlaying(true);
+    };
+
+    if (playerRef.current && isReadyRef.current) {
+      triggerPlay();
     } else {
-      setTimeout(() => {
-        if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
-          playerRef.current.loadVideoById(videoId);
-          playerRef.current.playVideo();
-          setIsPlaying(true);
-        }
-      }, 200);
+      setTimeout(triggerPlay, 300);
     }
-  }, []);
+  }, [volume]);
 
   const handleNext = useCallback(() => {
     if (queue.length > 0) {
@@ -176,10 +172,12 @@ export const SpotifyApp: React.FC = () => {
     }
 
     if (songs.length === 0) return;
+
     if (repeatMode === 'one' && currentSong) {
       playSongById(currentSong.id);
       return;
     }
+
     if (isShuffle) {
       const randomIdx = Math.floor(Math.random() * songs.length);
       setCurrentIndex(randomIdx);
@@ -190,6 +188,14 @@ export const SpotifyApp: React.FC = () => {
       if (songs[nextIdx]) playSongById(songs[nextIdx].id);
     }
   }, [songs, currentIndex, isShuffle, repeatMode, currentSong, queue, playSong, playSongById]);
+
+  const handlePrev = useCallback(() => {
+    if (songs.length === 0) return;
+
+    const prevIdx = (currentIndex - 1 + songs.length) % songs.length;
+    setCurrentIndex(prevIdx);
+    if (songs[prevIdx]) playSongById(songs[prevIdx].id);
+  }, [songs, currentIndex, playSongById]);
 
   useEffect(() => {
     const windowYT = window as unknown as { 
@@ -203,9 +209,17 @@ export const SpotifyApp: React.FC = () => {
           height: '1',
           width: '1',
           videoId: '',
-          playerVars: { autoplay: 1, controls: 0, enablejsapi: 1, origin: window.location.origin },
+          playerVars: { 
+            autoplay: 1, 
+            controls: 0, 
+            enablejsapi: 1, 
+            origin: window.location.origin,
+            playsinline: 1
+          },
           events: {
-            onReady: () => { isReadyRef.current = true; },
+            onReady: () => { 
+              isReadyRef.current = true; 
+            },
             onStateChange: (event: YTEvent) => {
               if (event.data === 0) handleNext();
               if (event.data === 1) setIsPlaying(true);
@@ -227,7 +241,6 @@ export const SpotifyApp: React.FC = () => {
     }
   }, [handleNext]);
 
-  // Pencarian lewat /api/search (YouTube Data API v3 via Vercel serverless function)
   const searchYouTube = async (query: string) => {
     if (!query.trim()) return;
     setIsSearchFocused(false);
@@ -272,11 +285,7 @@ export const SpotifyApp: React.FC = () => {
         />
 
         <main className="flex-1 bg-black overflow-y-auto relative flex flex-col">
-          
-          {/* Header & Search Bar Khas YouTube Music */}
           <header className="sticky top-0 bg-black/95 backdrop-blur-md px-8 py-4 flex items-center justify-between z-30 border-b border-neutral-900">
-            
-            {/* Search Input Container */}
             <div ref={searchContainerRef} className="relative w-full max-w-lg">
               <div className="relative flex items-center">
                 <Search className="w-4 h-4 absolute left-4 text-neutral-400 pointer-events-none" />
@@ -306,7 +315,6 @@ export const SpotifyApp: React.FC = () => {
                 )}
               </div>
 
-              {/* Suggestions Dropdown */}
               {isSearchFocused && searchQuery.trim().length > 0 && (
                 <div className="absolute top-12 left-0 right-0 bg-[#0f0f0f] border border-neutral-800 rounded-2xl shadow-2xl z-50 overflow-hidden py-2 animate-fade-in">
                   <div className="py-1">
@@ -328,7 +336,6 @@ export const SpotifyApp: React.FC = () => {
               )}
             </div>
 
-            {/* Profile / Auth Buttons */}
             <div className="flex items-center gap-3">
               <button className="p-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-900">
                 <Cast className="w-5 h-5" />
@@ -478,45 +485,54 @@ export const SpotifyApp: React.FC = () => {
         </div>
       )}
 
-      <Player 
-        currentSong={currentSong}
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        duration={duration}
-        volume={volume}
-        isMuted={isMuted}
-        isShuffle={isShuffle}
-        repeatMode={repeatMode}
-        isLiked={currentSong ? likedSongs.some((s) => s.id === currentSong.id) : false}
-        showLyrics={activeTab === 'lyrics'}
-        showQueue={showQueue}
-        onTogglePlayPause={() => {
-          if (!playerRef.current) return;
-          if (isPlaying) { playerRef.current.pauseVideo(); setIsPlaying(false); }
-          else { playerRef.current.playVideo(); setIsPlaying(true); }
-        }}
-        onNext={handleNext}
-        onPrev={() => {
-          const prevIdx = (currentIndex - 1 + songs.length) % songs.length;
-          setCurrentIndex(prevIdx);
-          if (songs[prevIdx]) playSongById(songs[prevIdx].id);
-        }}
-        onSeek={(sec) => {
-          if (playerRef.current) { playerRef.current.seekTo(sec, true); setCurrentTime(sec); }
-        }}
-        onVolumeChange={(v) => { setVolume(v); if (playerRef.current) playerRef.current.setVolume(v); }}
-        onToggleMute={() => {
-          if (!playerRef.current) return;
-          if (isMuted) { playerRef.current.unMute(); setIsMuted(false); }
-          else { playerRef.current.mute(); setIsMuted(true); }
-        }}
-        onToggleShuffle={() => setIsShuffle(!isShuffle)}
-        onToggleRepeat={() => setRepeatMode(repeatMode === 'off' ? 'all' : repeatMode === 'all' ? 'one' : 'off')}
-        onToggleLike={(s) => setLikedSongs((prev) => prev.some((x) => x.id === s.id) ? prev.filter((x) => x.id !== s.id) : [...prev, s])}
-        onToggleLyrics={() => setActiveTab(activeTab === 'lyrics' ? 'home' : 'lyrics')}
-        onToggleQueue={() => setShowQueue(!showQueue)}
-        onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
-      />
+      {currentSong && (
+        <Player 
+          currentSong={currentSong}
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={duration}
+          volume={volume}
+          isMuted={isMuted}
+          isShuffle={isShuffle}
+          repeatMode={repeatMode}
+          isLiked={currentSong ? likedSongs.some((s) => s.id === currentSong.id) : false}
+          showLyrics={activeTab === 'lyrics'}
+          showQueue={showQueue}
+          onTogglePlayPause={() => {
+            if (!playerRef.current) return;
+            if (isPlaying) { 
+              playerRef.current.pauseVideo(); 
+              setIsPlaying(false); 
+            } else { 
+              if (typeof playerRef.current.unMute === 'function') playerRef.current.unMute();
+              playerRef.current.playVideo(); 
+              setIsPlaying(true); 
+            }
+          }}
+          onNext={handleNext}
+          onPrev={handlePrev}
+          onSeek={(sec: number) => {
+            if (playerRef.current) { playerRef.current.seekTo(sec, true); setCurrentTime(sec); }
+          }}
+          onVolumeChange={(v: number) => { 
+            setVolume(v); 
+            if (playerRef.current && typeof playerRef.current.setVolume === 'function') {
+              playerRef.current.setVolume(v); 
+            }
+          }}
+          onToggleMute={() => {
+            if (!playerRef.current) return;
+            if (isMuted) { playerRef.current.unMute(); setIsMuted(false); }
+            else { playerRef.current.mute(); setIsMuted(true); }
+          }}
+          onToggleShuffle={() => setIsShuffle(!isShuffle)}
+          onToggleRepeat={() => setRepeatMode(repeatMode === 'off' ? 'all' : repeatMode === 'all' ? 'one' : 'off')}
+          onToggleLike={(s: Song) => setLikedSongs((prev) => prev.some((x) => x.id === s.id) ? prev.filter((x) => x.id !== s.id) : [...prev, s])}
+          onToggleLyrics={() => setActiveTab(activeTab === 'lyrics' ? 'home' : 'lyrics')}
+          onToggleQueue={() => setShowQueue(!showQueue)}
+          onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+        />
+      )}
 
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>

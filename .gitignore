@@ -7,10 +7,15 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies & Build
 node_modules
 dist
 dist-ssr
 *.local
+
+# Executables & Large Binaries
+*.exe
+server/ffmpeg.exe
 
 # Editor directories and files
 .vscode/*

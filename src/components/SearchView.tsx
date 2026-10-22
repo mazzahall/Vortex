@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Song } from '../types/music';
+import { downloadSong } from '../utils/download';
 import { 
   Play, 
   ThumbsUp, 
@@ -22,11 +23,12 @@ interface SearchViewProps {
 }
 
 export const SearchView: React.FC<SearchViewProps> = ({
-  searchResults,
+  searchResults = [],
   onPlaySong,
   onAddToQueue,
 }) => {
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | number | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -39,27 +41,50 @@ export const SearchView: React.FC<SearchViewProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleDownloadClick = async (e: React.MouseEvent, song: Song) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setActiveMenuId(null);
+
+    const songId = song?.id;
+    if (!songId) {
+      alert('ID lagu tidak ditemukan.');
+      return;
+    }
+
+    setDownloadingId(songId);
+    try {
+      await downloadSong(String(songId), `${song.title || 'Music'} - ${song.artist || 'Artist'}`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {searchResults.length > 0 ? (
+      {searchResults && searchResults.length > 0 ? (
         <div>
           <h2 className="text-xl font-bold text-white mb-4">Hasil Pencarian</h2>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
-            {searchResults.map((song) => {
-              const isMenuOpen = activeMenuId === song.id;
+            {searchResults.map((song, index) => {
+              const itemKey = song?.id ?? index;
+              const isMenuOpen = String(activeMenuId) === String(itemKey);
+              const isDownloading = String(downloadingId) === String(itemKey);
 
               return (
                 <div
-                  key={song.id}
-                  onClick={() => onPlaySong(song)}
+                  key={itemKey}
+                  onClick={() => onPlaySong && onPlaySong(song)}
                   className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-900/90 transition duration-150 cursor-pointer group relative"
                 >
                   <div className="flex items-center gap-4 min-w-0 flex-1">
                     <div className="relative w-12 h-12 flex-shrink-0 rounded-md overflow-hidden bg-neutral-900">
                       <img
-                        src={song.cover}
-                        alt={song.title}
+                        src={song?.cover || ''}
+                        alt={song?.title || 'Cover'}
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
@@ -69,10 +94,10 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
                     <div className="truncate pr-2">
                       <h3 className="text-sm font-semibold text-white truncate group-hover:text-neutral-200">
-                        {song.title}
+                        {song?.title || 'Judul tidak diketahui'}
                       </h3>
                       <p className="text-xs text-neutral-400 truncate mt-0.5">
-                        {song.artist}
+                        {song?.artist || 'Artis tidak diketahui'}
                       </p>
                     </div>
                   </div>
@@ -95,7 +120,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          setActiveMenuId(isMenuOpen ? null : song.id);
+                          setActiveMenuId(isMenuOpen ? null : itemKey);
                         }} 
                         className="p-2 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800 transition"
                       >
@@ -112,11 +137,11 @@ export const SearchView: React.FC<SearchViewProps> = ({
                             <Radio className="w-4 h-4 text-neutral-300" />
                             <span>Mulai mix</span>
                           </button>
-                          <button onClick={() => { onAddToQueue(song); setActiveMenuId(null); }} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                          <button onClick={() => { if (onAddToQueue) onAddToQueue(song); setActiveMenuId(null); }} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
                             <PlaySquare className="w-4 h-4 text-neutral-300" />
                             <span>Putar setelah ini</span>
                           </button>
-                          <button onClick={() => { onAddToQueue(song); setActiveMenuId(null); }} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+                          <button onClick={() => { if (onAddToQueue) onAddToQueue(song); setActiveMenuId(null); }} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
                             <ListPlus className="w-4 h-4 text-neutral-300" />
                             <span>Tambahkan ke antrean</span>
                           </button>
@@ -124,10 +149,18 @@ export const SearchView: React.FC<SearchViewProps> = ({
                             <Bookmark className="w-4 h-4 text-neutral-300" />
                             <span>Simpan ke koleksi</span>
                           </button>
-                          <button onClick={() => setActiveMenuId(null)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
+
+                          {/* Tombol Download Aman */}
+                          <button 
+                            type="button"
+                            onClick={(e) => handleDownloadClick(e, song)} 
+                            disabled={isDownloading}
+                            className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left disabled:opacity-50"
+                          >
                             <Download className="w-4 h-4 text-neutral-300" />
-                            <span>Download</span>
+                            <span>{isDownloading ? 'Proses...' : 'Download'}</span>
                           </button>
+
                           <button onClick={() => setActiveMenuId(null)} className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left">
                             <FolderPlus className="w-4 h-4 text-neutral-300" />
                             <span>Simpan ke playlist</span>

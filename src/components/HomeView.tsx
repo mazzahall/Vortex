@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Song } from '../types/music';
+import { downloadSong } from '../utils/download';
 import { 
   Play, 
   ThumbsUp, 
@@ -26,7 +27,7 @@ interface HomeViewProps {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
-  songs,
+  songs = [],
   onSelectSong,
   onGoToSearch,
   onPlayNext,
@@ -34,8 +35,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onToggleLike,
   onSaveToPlaylist,
 }) => {
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | number | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -48,57 +49,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleDownloadSong = async (e: React.MouseEvent, song: Song) => {
+  const handleDownloadClick = async (e: React.MouseEvent, song: Song) => {
     e.stopPropagation();
+    e.preventDefault();
     setActiveMenuId(null);
-    setDownloadingId(song.id);
 
+    const songId = song?.id;
+    if (!songId) {
+      alert('ID lagu tidak ditemukan.');
+      return;
+    }
+
+    setDownloadingId(songId);
     try {
-      if (song.audioUrl) {
-        const link = document.createElement('a');
-        link.href = song.audioUrl;
-        link.download = `${song.title} - ${song.artist}.mp3`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else if (song.id) {
-        // Menggunakan Cobalt API untuk langsung mengambil direct stream file MP3
-        const response = await fetch('https://co.wuk.sh/api/json', {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            url: `https://www.youtube.com/watch?v=${song.id}`,
-            isAudioOnly: true,
-            aFormat: 'mp3'
-          })
-        });
-
-        const data = await response.json();
-
-        if (data.url) {
-          const a = document.createElement('a');
-          a.href = data.url;
-          a.download = `${song.title} - ${song.artist}.mp3`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        } else {
-          // Fallback jika API sedang sibuk: buka halaman converter bersih tanpa spasi URL
-          window.open(`https://y2mate.nu/en-1/youtube-to-mp3?q=https://www.youtube.com/watch?v=${song.id}`, '_blank');
-        }
-      } else {
-        alert('ID lagu tidak ditemukan.');
-      }
+      await downloadSong(String(songId), `${song.title || 'Music'} - ${song.artist || 'Artist'}`);
     } catch (err) {
-      console.error('Download error:', err);
-      if (song.id) {
-        window.open(`https://y2mate.nu/en-1/youtube-to-mp3?q=https://www.youtube.com/watch?v=${song.id}`, '_blank');
-      } else {
-        alert('Gagal mengunduh lagu.');
-      }
+      console.error('Error saat mendownload:', err);
     } finally {
       setDownloadingId(null);
     }
@@ -113,20 +79,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2 relative">
           {songs.map((song, index) => {
-            const isMenuOpen = activeMenuId === song.id;
-            const isDownloadingThisSong = downloadingId === song.id;
+            const songIdentifier = song?.id ?? index;
+            const isMenuOpen = String(activeMenuId) === String(songIdentifier);
+            const isDownloading = String(downloadingId) === String(songIdentifier);
 
             return (
               <div
-                key={song.id || index}
-                onClick={() => onSelectSong(index, songs)}
+                key={songIdentifier}
+                onClick={() => onSelectSong && onSelectSong(index, songs)}
                 className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-900/90 transition duration-150 cursor-pointer group relative"
               >
                 <div className="flex items-center gap-4 min-w-0 flex-1">
                   <div className="relative w-12 h-12 flex-shrink-0 rounded-md overflow-hidden bg-neutral-900">
                     <img 
-                      src={song.cover} 
-                      alt={song.title} 
+                      src={song?.cover || ''} 
+                      alt={song?.title || 'Cover'} 
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
@@ -136,10 +103,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
                   <div className="truncate pr-2">
                     <h3 className="text-sm font-semibold text-white truncate group-hover:text-neutral-200">
-                      {song.title}
+                      {song?.title || 'Judul tidak diketahui'}
                     </h3>
                     <p className="text-xs text-neutral-400 truncate mt-0.5">
-                      {song.artist}
+                      {song?.artist || 'Artis tidak diketahui'}
                     </p>
                   </div>
                 </div>
@@ -168,7 +135,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        setActiveMenuId(isMenuOpen ? null : song.id);
+                        setActiveMenuId(isMenuOpen ? null : songIdentifier);
                       }} 
                       className="p-2 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800 transition"
                     >
@@ -182,7 +149,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             onGoToSearch(`${song.artist} mix`);
                             setActiveMenuId(null);
                           }} 
@@ -193,7 +161,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         </button>
 
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             if (onPlayNext) onPlayNext(song);
                             setActiveMenuId(null);
                           }} 
@@ -204,7 +173,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         </button>
 
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             if (onAddToQueue) onAddToQueue(song);
                             setActiveMenuId(null);
                           }} 
@@ -215,7 +185,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         </button>
 
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             if (onToggleLike) onToggleLike(song);
                             setActiveMenuId(null);
                           }} 
@@ -226,16 +197,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         </button>
 
                         <button 
-                          onClick={(e) => handleDownloadSong(e, song)}
-                          disabled={isDownloadingThisSong}
-                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left disabled:opacity-50"
+                          type="button"
+                          onClick={(e) => handleDownloadClick(e, song)}
+                          disabled={isDownloading}
+                          className="w-full flex items-center gap-3.5 px-4 py-2.5 hover:bg-neutral-800 transition text-left text-neutral-200 disabled:opacity-50 cursor-pointer"
                         >
                           <Download className="w-4 h-4 text-neutral-300" />
-                          <span>{isDownloadingThisSong ? 'Memproses...' : 'Download'}</span>
+                          <span>{isDownloading ? 'Proses...' : 'Download'}</span>
                         </button>
 
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             if (onSaveToPlaylist) onSaveToPlaylist(song);
                             setActiveMenuId(null);
                           }} 
@@ -246,7 +219,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         </button>
 
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             onGoToSearch(`Album ${song.artist}`);
                             setActiveMenuId(null);
                           }} 
