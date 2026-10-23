@@ -12,13 +12,13 @@ def download():
     if not video_id:
         return jsonify({"error": "Video ID dibutuhkan"}), 400
 
-    # Mengembalikan URL widget converter langsung ke frontend
-    widget_url = f"https://api.vevioz.com/api/button/mp3/{video_id}"
+    # Menggunakan Cobalt Web Service yang stabil & bebas iklan/error
+    cobalt_url = f"https://cobalt.tools/#https://www.youtube.com/watch?v={video_id}"
     
     return jsonify({
         "status": "success",
         "videoId": video_id,
-        "downloadWidget": widget_url
+        "downloadWidget": cobalt_url
     })
 
 if __name__ == '__main__':
