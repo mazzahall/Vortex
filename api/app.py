@@ -1,42 +1,55 @@
-from flask import Flask, request, jsonify, redirect
+import os
+import tempfile
+from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
-import requests
+import yt_dlp
 
 app = Flask(__name__)
+# Izinkan CORS dari frontend Vercel kamu
 CORS(app)
 
-@app.route('/api/download', methods=['GET'])
-@app.route('/download', methods=['GET'])
-def download():
+@app.route('/api/download-mp3', methods=['GET'])
+def download_mp3():
     video_id = request.args.get('videoId')
-
     if not video_id:
         return jsonify({"error": "Video ID dibutuhkan"}), 400
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    
+    # Simpan file sementara di direktori temp OS
+    temp_dir = tempfile.gettempdir()
+    output_template = os.path.join(temp_dir, f"{video_id}.%(ext)s")
+    
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+        'outtmpl': output_template,
+        'quiet': True,
+        'no_warnings': True,
     }
 
-    # Kumpulan Endpoint Direct MP3 Stream
     try:
-        # Pilihan 1: Direct MP3 Stream API (Langsung pemicu download di browser)
-        direct_url = f"https://ytstream-download-api.vercel.app/api/download?id={video_id}"
-        res = requests.head(direct_url, headers=headers, timeout=5)
-        if res.status_code < 400:
-            return redirect(direct_url, code=302)
-    except Exception as e:
-        print(f"Primary direct stream error: {e}")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        
+        mp3_file = os.path.join(temp_dir, f"{video_id}.mp3")
+        
+        if not os.path.exists(mp3_file):
+            return jsonify({"error": "Gagal memproses file MP3"}), 500
 
-    try:
-        # Pilihan 2: Fallback Direct Audio Endpoint
-        backup_url = f"https://api.download-mp3.net/api/v1/download?id={video_id}"
-        return redirect(backup_url, code=302)
+        return send_file(
+            mp3_file, 
+            as_attachment=True, 
+            download_name=f"{video_id}.mp3",
+            mimetype="audio/mpeg"
+        )
     except Exception as e:
-        print(f"Backup direct stream error: {e}")
-
-    # Pilihan 3: Direct CDN Stream Fallback
-    cdn_fallback = f"https://y2mate.is/api/v1/download?v={video_id}&f=mp3"
-    return redirect(cdn_fallback, code=302)
+        print(f"Error converting video {video_id}: {str(e)}")
+        return jsonify({"error": f"Konversi gagal: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(port=4000)
+    app.run(host='0.0.0.0', port=5000)
