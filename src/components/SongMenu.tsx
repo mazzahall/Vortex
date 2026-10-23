@@ -40,7 +40,7 @@ export const SongMenu: React.FC<SongMenuProps> = ({
     setIsDownloading(true);
 
     try {
-      await downloadSong(song.id, `${song.title} - ${song.artist}`);
+      await downloadSong(song.id);
     } catch (err) {
       console.error('Download error:', err);
     } finally {
@@ -98,7 +98,7 @@ export const SongMenu: React.FC<SongMenuProps> = ({
             <span>Simpan ke koleksi</span>
           </button>
 
-          {/* Fitur Download di Menu Atas */}
+          {/* Fitur Download Internal */}
           <button 
             onClick={handleDownload} 
             disabled={isDownloading}
